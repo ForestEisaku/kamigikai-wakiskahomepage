@@ -16,6 +16,7 @@ type Question = {
   id?: string;
   date: string;
   councilTitle: string;
+  questioner: string;
   speaker: string;
   summary: string;
   timestamp: string;
@@ -30,6 +31,7 @@ export default function ArchivePage() {
   const [query, setQuery] = useState('');
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [councilTitle, setCouncilTitle] = useState('');
+  const [questioner, setQuestioner] = useState('');
   const [speaker, setSpeaker] = useState('');
   const [rawInput, setRawInput] = useState('');
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -86,7 +88,7 @@ export default function ArchivePage() {
   };
 
   const handleSubmit = async () => {
-    if (!youtubeUrl.trim() || !rawInput.trim() || !speaker.trim() || !councilTitle.trim()) {
+    if (!youtubeUrl.trim() || !rawInput.trim() || !speaker.trim() || !councilTitle.trim() || !questioner.trim()) {
       alert('全ての入力欄を埋めてください');
       return;
     }
@@ -102,6 +104,7 @@ export default function ArchivePage() {
         await addDoc(collection(db, 'questions'), {
           date: new Date().toISOString().split('T')[0],
           councilTitle,
+          questioner,
           speaker,
           summary,
           timestamp: timestamp.replace(/[()]/g, ''),
@@ -118,6 +121,7 @@ export default function ArchivePage() {
       setRawInput('');
       setYoutubeUrl('');
       setCouncilTitle('');
+      setQuestioner('');
       setSpeaker('');
     } catch (err) {
       console.error(err);
@@ -141,7 +145,8 @@ export default function ArchivePage() {
     q.speaker.includes(query) ||
     q.date.includes(query) ||
     q.summary.includes(query) ||
-    q.councilTitle.includes(query)
+    q.councilTitle.includes(query) ||
+    q.questioner.includes(query)
   );
 
   return (
@@ -154,7 +159,7 @@ export default function ArchivePage() {
         type="text"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="キーワード検索（例：〇〇議員、キャッシュレス、子育て）"
+        placeholder="キーワード検索（例：吉川、キャッシュレス）"
         className="w-full border p-2 rounded"
       />
 
@@ -163,7 +168,7 @@ export default function ArchivePage() {
           const isExpanded = expandedId === item.id;
           return (
             <div key={item.id} className="border p-3 rounded bg-white shadow-sm">
-              <div className="text-sm text-gray-600">{item.date}｜{item.councilTitle}｜{item.speaker}</div>
+              <div className="text-sm text-gray-600">{item.date}｜{item.councilTitle}｜質問者：{item.questioner}｜発言者：{item.speaker}</div>
               <div className="text-md">
                 <a
                   href={formatYoutubeLink(item.youtubeUrl, item.timestamp)}
@@ -230,9 +235,16 @@ export default function ArchivePage() {
           />
 
           <input
+            value={questioner}
+            onChange={(e) => setQuestioner(e.target.value)}
+            placeholder="誰の一般質問か（例：松岡大悟議員）"
+            className="w-full border p-2 rounded"
+          />
+
+          <input
             value={speaker}
             onChange={(e) => setSpeaker(e.target.value)}
-            placeholder="発言者名を入力（例：吉川康治議員）"
+            placeholder="発言者名（例：町長、課長、議員名など）"
             className="w-full border p-2 rounded"
           />
 
