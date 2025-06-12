@@ -12,13 +12,7 @@ import {
   User,
 } from 'firebase/auth';
 
-const GIKAI_NAMES = [
-  '2025年6月定例会',
-  '2025年3月定例会',
-  '2024年12月定例会',
-  '2024年9月定例会',
-];
-
+// Define question type
 type Question = {
   id?: string;
   date: string;
@@ -29,6 +23,7 @@ type Question = {
   title?: string;
   publishedAt?: string;
   author?: string;
+  session?: string;
 };
 
 export default function ArchivePage() {
@@ -37,11 +32,17 @@ export default function ArchivePage() {
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [speaker, setSpeaker] = useState('');
   const [rawInput, setRawInput] = useState('');
-  const [gikaiName, setGikaiName] = useState('');
   const [questions, setQuestions] = useState<Question[]>([]);
   const [videoMeta, setVideoMeta] = useState<{ title: string; publishedAt: string } | null>(null);
-  const [previewLines, setPreviewLines] = useState<string[]>([]);
-  const [urlError, setUrlError] = useState('');
+  const [session, setSession] = useState('');
+  const [error, setError] = useState('');
+
+  const pastSessions = [
+    '2025年3月定例会',
+    '2024年12月定例会',
+    '2024年9月定例会',
+    '2024年6月定例会',
+  ];
 
   useEffect(() => {
     onAuthStateChanged(auth, (currentUser) => setUser(currentUser));
@@ -60,10 +61,9 @@ export default function ArchivePage() {
     const fetchVideoMeta = async () => {
       if (!youtubeUrl.includes('watch?v=')) {
         setVideoMeta(null);
-        setUrlError('URLの形式が正しくありません。watch?v= が含まれている必要があります');
+        setError('YouTubeのURL形式が不正です');
         return;
       }
-      setUrlError('');
       const videoId = new URLSearchParams(new URL(youtubeUrl).search).get('v');
       if (!videoId) return;
 
@@ -75,10 +75,12 @@ export default function ArchivePage() {
         if (json.items && json.items.length > 0) {
           const snippet = json.items[0].snippet;
           setVideoMeta({ title: snippet.title, publishedAt: snippet.publishedAt });
+          setError('');
         }
       } catch (err) {
         console.error('YouTube API error:', err);
         setVideoMeta(null);
+        setError('YouTube動画情報の取得に失敗しました');
       }
     };
 
@@ -94,14 +96,9 @@ export default function ArchivePage() {
     await signOut(auth);
   };
 
-  const handlePreview = () => {
-    const lines = rawInput.split('\n').filter(Boolean);
-    setPreviewLines(lines);
-  };
-
   const handleSubmit = async () => {
-    if (!youtubeUrl.trim() || !rawInput.trim() || !gikaiName.trim()) {
-      alert('必要な情報が入力されていません');
+    if (!youtubeUrl.trim() || !rawInput.trim()) {
+      alert('YouTube URLと要約を入力してください');
       return;
     }
 
@@ -114,7 +111,7 @@ export default function ArchivePage() {
 
         const [, timestamp, summary] = match;
         await addDoc(collection(db, 'questions'), {
-          date: gikaiName,
+          date: new Date().toISOString().split('T')[0],
           speaker: speaker || '（未入力）',
           summary,
           timestamp: timestamp.replace(/[()]/g, ''),
@@ -123,31 +120,30 @@ export default function ArchivePage() {
           publishedAt: videoMeta?.publishedAt || '',
           createdAt: new Date(),
           author: user?.email || '',
+          session: session || '',
         });
       });
 
       await Promise.all(batch);
       alert('保存しました');
-      // フォームリセットは行わない（連続投稿を考慮）
-      handlePreview();
+      // 保持：setRawInput(''); setSpeaker(''); setYoutubeUrl(''); はコメントアウト
     } catch (err) {
       console.error(err);
       alert('保存に失敗しました');
     }
   };
 
-  const handleClear = () => {
-    setYoutubeUrl('');
-    setSpeaker('');
-    setRawInput('');
-    setGikaiName('');
-    setPreviewLines([]);
-  };
-
   const handleDelete = async (id: string) => {
     if (!confirm('この投稿を削除しますか？')) return;
     await deleteDoc(doc(db, 'questions', id));
     setQuestions(questions.filter((q) => q.id !== id));
+  };
+
+  const handleClear = () => {
+    setYoutubeUrl('');
+    setSpeaker('');
+    setRawInput('');
+    setSession('');
   };
 
   const formatYoutubeLink = (url: string, timestamp: string) => {
@@ -159,7 +155,8 @@ export default function ArchivePage() {
   const filtered = questions.filter((q) =>
     q.speaker.includes(query) ||
     q.date.includes(query) ||
-    q.summary.includes(query)
+    q.summary.includes(query) ||
+    q.session?.includes(query)
   );
 
   return (
@@ -172,14 +169,14 @@ export default function ArchivePage() {
         type="text"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="キーワード検索（例：吉川、キャッシュレス）"
+        placeholder="キーワード検索（例：吉川、キャッシュレス、2025年3月定例会）"
         className="w-full border p-2 rounded"
       />
 
       <div className="space-y-2">
         {filtered.map((item) => (
           <div key={item.id} className="border p-3 rounded bg-white shadow-sm">
-            <div className="text-sm text-gray-600">{item.date}｜{item.speaker}</div>
+            <div className="text-sm text-gray-600">{item.date}｜{item.session}｜{item.speaker}</div>
             <div className="text-md">
               <a
                 href={formatYoutubeLink(item.youtubeUrl, item.timestamp)}
@@ -218,32 +215,30 @@ export default function ArchivePage() {
           <h2 className="font-semibold text-lg">投稿フォーム（管理者専用）</h2>
 
           <input
-            value={gikaiName}
-            onChange={(e) => setGikaiName(e.target.value)}
-            placeholder="議会名（例：2025年3月定例会）"
-            list="gikai-list"
+            list="session-list"
+            value={session}
+            onChange={(e) => setSession(e.target.value)}
+            placeholder="【1】議会名（例：2025年3月定例会）"
             className="w-full border p-2 rounded"
           />
-          <datalist id="gikai-list">
-            {GIKAI_NAMES.map((name) => (
-              <option key={name} value={name} />
-            ))}
+          <datalist id="session-list">
+            {pastSessions.map((s) => <option key={s} value={s} />)}
           </datalist>
 
           <input
             value={speaker}
             onChange={(e) => setSpeaker(e.target.value)}
-            placeholder="発言者名を入力（例：吉川康治議員）"
+            placeholder="【2】発言者名（例：吉川康治議員）"
             className="w-full border p-2 rounded"
           />
 
           <input
             value={youtubeUrl}
             onChange={(e) => setYoutubeUrl(e.target.value)}
-            placeholder="YouTube URL を入力"
+            placeholder="【3】YouTube URL"
             className="w-full border p-2 rounded"
           />
-          {urlError && <div className="text-sm text-red-500">{urlError}</div>}
+          {error && <div className="text-red-600 text-sm">{error}</div>}
           {videoMeta && (
             <div className="text-sm text-gray-600">
               🎬 {videoMeta.title}（投稿日：{videoMeta.publishedAt.split('T')[0]}）
@@ -253,27 +248,28 @@ export default function ArchivePage() {
           <textarea
             value={rawInput}
             onChange={(e) => setRawInput(e.target.value)}
-            onBlur={handlePreview}
-            placeholder={`タイムスタンプと要約を貼り付け（例）\n0:02 キャッシュレス対応の質問\n2:01 導入状況の回答`}
+            placeholder={`【4】タイムスタンプと要約（複数行）\n例：\n0:02 キャッシュレス対応の質問\n2:01 導入状況の回答`}
             rows={6}
             className="w-full border p-2 rounded"
           />
 
-          <button onClick={handleSubmit} className="bg-green-600 text-white px-4 py-2 rounded">
-            投稿（Firestoreに保存）
-          </button>
-          <button onClick={handleClear} className="ml-4 border border-gray-400 text-gray-600 px-4 py-2 rounded">
-            全てクリア
-          </button>
+          <div className="flex gap-4">
+            <button onClick={handleSubmit} className="bg-green-600 text-white px-4 py-2 rounded">
+              投稿（Firestoreに保存）
+            </button>
+            <button onClick={handleClear} className="bg-gray-400 text-white px-4 py-2 rounded">
+              全てクリア
+            </button>
+          </div>
 
-          {previewLines.length > 0 && (
-            <div className="mt-4 border-t pt-2">
-              <h3 className="font-semibold text-sm mb-2">投稿プレビュー</h3>
-              {previewLines.map((line, idx) => (
-                <div key={idx} className="text-sm text-gray-700">{line}</div>
+          <div className="mt-4">
+            <h3 className="font-semibold text-sm mb-2">⏳ プレビュー（投稿前の確認）</h3>
+            <div className="space-y-1 text-sm">
+              {rawInput.split('\n').map((line, idx) => (
+                <div key={idx} className="bg-white border rounded p-1">{line}</div>
               ))}
             </div>
-          )}
+          </div>
         </div>
       ) : (
         <div className="text-center">
@@ -285,4 +281,3 @@ export default function ArchivePage() {
     </main>
   );
 }
-
