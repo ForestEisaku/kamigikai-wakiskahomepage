@@ -13,12 +13,12 @@ import {
 } from 'firebase/auth';
 
 const pastMeetings = [
-  '2025年6月定例会',
-  '2025年3月定例会',
-  '2024年12月定例会',
-  '2024年9月定例会',
-  '2024年6月定例会',
-  '2024年3月定例会'
+  '2025年6月定例会一般質問',
+  '2025年3月定例会一般質問',
+  '2024年12月定例会一般質問',
+  '2024年9月定例会一般質問',
+  '2024年6月定例会一般質問',
+  '2024年3月定例会一般質問'
 ];
 
 type Question = {
@@ -145,52 +145,22 @@ export default function ArchivePage() {
     }
   };
 
-  const handleClear = () => {
-    setMeeting('');
-    setSpeaker('');
-    setYoutubeUrl('');
-    setRawInput('');
-    setPreviewEntries([]);
-  };
-
-  const handlePreview = () => {
-    const lines = rawInput.split('\n').map(l => l.trim());
-    const entries: { timestamp: string; summary: string }[] = [];
-
-    let current: { timestamp: string; summary: string } | null = null;
-
-    for (const line of lines) {
-      const match = line.match(/^(\(?\d+:\d+\)?)[\s　]*(.+)$/);
-      if (match) {
-        if (current) entries.push(current);
-        current = {
-          timestamp: match[1].replace(/[()]/g, ''),
-          summary: match[2]
-        };
-      } else if (current) {
-        current.summary += '\n' + line;
-      }
-    }
-    if (current) entries.push(current);
-    setPreviewEntries(entries);
-  };
-
   const handleDelete = async (id: string) => {
     if (!confirm('この投稿を削除しますか？')) return;
     await deleteDoc(doc(db, 'questions', id));
     setQuestions(questions.filter((q) => q.id !== id));
   };
 
-  const toggleExpand = (id: string) => {
-    setExpandedIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
-  };
-
   const formatYoutubeLink = (url: string, timestamp: string) => {
     const [min, sec] = timestamp.split(':').map(Number);
     const seconds = min * 60 + sec;
     return `${url}&t=${seconds}s`;
+  };
+
+  const toggleExpand = (id: string) => {
+    setExpandedIds((prev) =>
+      prev.includes(id) ? prev.filter(eid => eid !== id) : [...prev, id]
+    );
   };
 
   const filtered = questions.filter((q) =>
@@ -202,10 +172,6 @@ export default function ArchivePage() {
 
   return (
     <main className="p-6 max-w-4xl mx-auto space-y-8">
-      <div className="text-center">
-        <h1 className="text-2xl font-bold">香美町議会 一般質問アーカイブ検索</h1>
-      </div>
-
       <input
         type="text"
         value={query}
@@ -215,43 +181,50 @@ export default function ArchivePage() {
       />
 
       <div className="space-y-2">
-        {filtered.map((item) => (
-          <div key={item.id} className="border p-3 rounded bg-white shadow-sm">
-            <div className="text-sm text-gray-600">{item.date}｜{item.meeting}｜{item.speaker}</div>
-            <div className="text-md whitespace-pre-line">
-              <a
-                href={formatYoutubeLink(item.youtubeUrl, item.timestamp)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 underline"
-              >
-                {item.timestamp}
-              </a>
-              ：<span className={expandedIds.includes(item.id ?? '') ? '' : 'line-clamp-2'}>{item.summary}</span>
-              {item.summary.split('\n').length > 2 && (
-                <button
-                  onClick={() => item.id && toggleExpand(item.id)}
-                  className="ml-2 text-blue-600 text-sm underline"
+        {filtered.map((item) => {
+          const isExpanded = expandedIds.includes(item.id || '');
+          const lines = item.summary.split('\n');
+          const displaySummary = isExpanded ? item.summary : lines.slice(0, 2).join('\n');
+          const hasMore = lines.length > 2;
+          return (
+            <div key={item.id} className="border p-3 rounded bg-white shadow-sm">
+              <div className="text-sm text-gray-600">{item.date}｜{item.meeting}｜{item.speaker}</div>
+              <div className="text-md whitespace-pre-line">
+                <a
+                  href={formatYoutubeLink(item.youtubeUrl, item.timestamp)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 underline"
                 >
-                  {expandedIds.includes(item.id ?? '') ? '閉じる' : '詳しく見る'}
+                  {item.timestamp}
+                </a>
+                ：{displaySummary}
+                {hasMore && (
+                  <div>
+                    <button
+                      onClick={() => toggleExpand(item.id || '')}
+                      className="text-blue-600 text-sm underline ml-2"
+                    >
+                      {isExpanded ? '閉じる' : 'もっと見る'}
+                    </button>
+                  </div>
+                )}
+              </div>
+              {item.title && (
+                <div className="text-xs text-gray-500 mt-1">🎬 {item.title}（投稿日：{item.publishedAt?.split('T')[0]}）</div>
+              )}
+              {user?.email === item.author && (
+                <button
+                  onClick={() => item.id && handleDelete(item.id)}
+                  className="text-red-600 text-sm underline mt-1"
+                >
+                  削除
                 </button>
               )}
             </div>
-            {item.title && (
-              <div className="text-xs text-gray-500 mt-1">🎬 {item.title}（投稿日：{item.publishedAt?.split('T')[0]}）</div>
-            )}
-            {user?.email === item.author && (
-              <button
-                onClick={() => item.id && handleDelete(item.id)}
-                className="text-red-600 text-sm underline mt-1"
-              >
-                削除
-              </button>
-            )}
-          </div>
-        ))}
+          );
+        })}
       </div>
-      {/* 投稿フォームなど省略部分は元のコードを流用してください */}
     </main>
   );
 }
