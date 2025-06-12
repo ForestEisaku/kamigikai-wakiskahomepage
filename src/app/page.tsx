@@ -98,7 +98,7 @@ export default function ArchivePage() {
         const match = line.match(/^(\(?\d+:\d+\)?)\s*(.+)$/);
         if (!match) return;
 
-        const [_, timestamp, summary] = match;
+        const [, timestamp, summary] = match;
         await addDoc(collection(db, 'questions'), {
           date: new Date().toISOString().split('T')[0],
           questioner: questioner || '（未入力）',
@@ -160,7 +160,7 @@ export default function ArchivePage() {
         type="text"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="キーワード検索（例：吉川、キャッシュレス）"
+        placeholder="キーワード検索（例：〇〇議員、子育て、キャッシュレス）"
         className="w-full border p-2 rounded"
       />
 
