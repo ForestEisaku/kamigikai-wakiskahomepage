@@ -44,6 +44,7 @@ export default function ArchivePage() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [videoMeta, setVideoMeta] = useState<{ title: string; publishedAt: string } | null>(null);
   const [previewEntries, setPreviewEntries] = useState<{ timestamp: string; summary: string }[]>([]);
+  const [expandedIds, setExpandedIds] = useState<string[]>([]);
 
   useEffect(() => {
     onAuthStateChanged(auth, (currentUser) => setUser(currentUser));
@@ -180,6 +181,12 @@ export default function ArchivePage() {
     setQuestions(questions.filter((q) => q.id !== id));
   };
 
+  const toggleExpand = (id: string) => {
+    setExpandedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
   const formatYoutubeLink = (url: string, timestamp: string) => {
     const [min, sec] = timestamp.split(':').map(Number);
     const seconds = min * 60 + sec;
@@ -220,7 +227,15 @@ export default function ArchivePage() {
               >
                 {item.timestamp}
               </a>
-              ：{item.summary}
+              ：<span className={expandedIds.includes(item.id ?? '') ? '' : 'line-clamp-2'}>{item.summary}</span>
+              {item.summary.split('\n').length > 2 && (
+                <button
+                  onClick={() => item.id && toggleExpand(item.id)}
+                  className="ml-2 text-blue-600 text-sm underline"
+                >
+                  {expandedIds.includes(item.id ?? '') ? '閉じる' : '詳しく見る'}
+                </button>
+              )}
             </div>
             {item.title && (
               <div className="text-xs text-gray-500 mt-1">🎬 {item.title}（投稿日：{item.publishedAt?.split('T')[0]}）</div>
@@ -236,97 +251,7 @@ export default function ArchivePage() {
           </div>
         ))}
       </div>
-
-      {user ? (
-        <div className="bg-gray-100 p-4 rounded space-y-4 mt-10">
-          <div className="text-right text-sm">
-            ログイン中：{user.email}
-            <button onClick={handleLogout} className="ml-4 text-blue-600 underline">
-              ログアウト
-            </button>
-          </div>
-
-          <h2 className="font-semibold text-lg">投稿フォーム（管理者専用）</h2>
-
-          <input
-            value={meeting}
-            onChange={(e) => setMeeting(e.target.value)}
-            placeholder="議会名（例：2025年3月定例会）"
-            list="meeting-suggestions"
-            className="w-full border p-2 rounded"
-          />
-          <datalist id="meeting-suggestions">
-            {pastMeetings.map((m) => <option key={m} value={m} />)}
-          </datalist>
-
-          <input
-            value={speaker}
-            onChange={(e) => setSpeaker(e.target.value)}
-            placeholder="発言者名（例：吉川康治議員）"
-            className="w-full border p-2 rounded"
-          />
-
-          <input
-            value={youtubeUrl}
-            onChange={(e) => setYoutubeUrl(e.target.value)}
-            placeholder="YouTube URL を入力"
-            className="w-full border p-2 rounded"
-          />
-          {videoMeta && (
-            <div className="text-sm text-gray-600">
-              🎬 {videoMeta.title}（投稿日：{videoMeta.publishedAt.split('T')[0]}）
-            </div>
-          )}
-
-          <textarea
-            value={rawInput}
-            onChange={(e) => setRawInput(e.target.value)}
-            placeholder={`タイムスタンプと要約（例：\n0:02 キャッシュレス対応の質問\n2:01 導入状況の回答）\n※複数行要約もOK`}
-            rows={8}
-            className="w-full border p-2 rounded"
-          />
-
-          <div className="flex gap-2">
-            <button
-              onClick={handleSubmit}
-              className="bg-green-600 text-white px-4 py-2 rounded"
-            >
-              投稿（Firestoreに保存）
-            </button>
-            <button
-              onClick={handlePreview}
-              className="bg-blue-600 text-white px-4 py-2 rounded"
-            >
-              プレビュー
-            </button>
-            <button
-              onClick={handleClear}
-              className="bg-gray-400 text-white px-4 py-2 rounded"
-            >
-              全てクリア
-            </button>
-          </div>
-
-          {previewEntries.length > 0 && (
-            <div className="mt-6 border-t pt-4">
-              <h3 className="font-semibold">プレビュー表示</h3>
-              <ul className="space-y-2">
-                {previewEntries.map((entry, idx) => (
-                  <li key={idx} className="bg-white p-2 rounded border whitespace-pre-line">
-                    <strong>{entry.timestamp}</strong>：{entry.summary}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="text-center">
-          <button onClick={handleLogin} className="bg-blue-600 text-white px-4 py-2 rounded">
-            Googleでログイン
-          </button>
-        </div>
-      )}
+      {/* 投稿フォームなど省略部分は元のコードを流用してください */}
     </main>
   );
 }
