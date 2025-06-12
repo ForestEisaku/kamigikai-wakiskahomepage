@@ -15,6 +15,7 @@ import {
 type Question = {
   id?: string;
   date: string;
+  councilTitle: string;
   speaker: string;
   summary: string;
   timestamp: string;
@@ -28,6 +29,7 @@ export default function ArchivePage() {
   const [user, setUser] = useState<User | null>(null);
   const [query, setQuery] = useState('');
   const [youtubeUrl, setYoutubeUrl] = useState('');
+  const [councilTitle, setCouncilTitle] = useState('');
   const [speaker, setSpeaker] = useState('');
   const [rawInput, setRawInput] = useState('');
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -84,8 +86,8 @@ export default function ArchivePage() {
   };
 
   const handleSubmit = async () => {
-    if (!youtubeUrl.trim() || !rawInput.trim()) {
-      alert('YouTube URLと要約を入力してください');
+    if (!youtubeUrl.trim() || !rawInput.trim() || !speaker.trim() || !councilTitle.trim()) {
+      alert('全ての入力欄を埋めてください');
       return;
     }
 
@@ -99,7 +101,8 @@ export default function ArchivePage() {
         const [_, timestamp, summary] = match;
         await addDoc(collection(db, 'questions'), {
           date: new Date().toISOString().split('T')[0],
-          speaker: speaker || '（未入力）',
+          councilTitle,
+          speaker,
           summary,
           timestamp: timestamp.replace(/[()]/g, ''),
           youtubeUrl,
@@ -114,6 +117,7 @@ export default function ArchivePage() {
       alert('保存しました');
       setRawInput('');
       setYoutubeUrl('');
+      setCouncilTitle('');
       setSpeaker('');
     } catch (err) {
       console.error(err);
@@ -136,7 +140,8 @@ export default function ArchivePage() {
   const filtered = questions.filter((q) =>
     q.speaker.includes(query) ||
     q.date.includes(query) ||
-    q.summary.includes(query)
+    q.summary.includes(query) ||
+    q.councilTitle.includes(query)
   );
 
   return (
@@ -149,50 +154,49 @@ export default function ArchivePage() {
         type="text"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="キーワード検索（例：吉川、キャッシュレス）"
+        placeholder="キーワード検索（例：〇〇議員、キャッシュレス、子育て）"
         className="w-full border p-2 rounded"
       />
 
       <div className="space-y-2">
-        {filtered.map((item) => (
-          <div key={item.id} className="border p-3 rounded bg-white shadow-sm">
-            <div className="text-sm text-gray-600">{item.date}｜{item.speaker}</div>
-            <div className="text-md">
-              <a
-                href={formatYoutubeLink(item.youtubeUrl, item.timestamp)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 underline"
-              >
-                {item.timestamp}
-              </a>
-              ：{expandedId === item.id
-                ? item.summary
-                : item.summary.slice(0, 50) + (item.summary.length > 50 ? '…' : '')}
+        {filtered.map((item) => {
+          const isExpanded = expandedId === item.id;
+          return (
+            <div key={item.id} className="border p-3 rounded bg-white shadow-sm">
+              <div className="text-sm text-gray-600">{item.date}｜{item.councilTitle}｜{item.speaker}</div>
+              <div className="text-md">
+                <a
+                  href={formatYoutubeLink(item.youtubeUrl, item.timestamp)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 underline"
+                >
+                  {item.timestamp}
+                </a>
+                ：{isExpanded ? item.summary : item.summary.slice(0, 50) + (item.summary.length > 50 ? '...' : '')}
+              </div>
+              {item.title && (
+                <div className="text-xs text-gray-500 mt-1">🎬 {item.title}（投稿日：{item.publishedAt?.split('T')[0]}）</div>
+              )}
+              {item.summary.length > 50 && (
+                <button
+                  onClick={() => setExpandedId(isExpanded ? null : item.id!)}
+                  className="text-blue-600 text-sm underline mt-1"
+                >
+                  {isExpanded ? '閉じる' : 'もっと見る'}
+                </button>
+              )}
+              {user?.email === item.author && (
+                <button
+                  onClick={() => item.id && handleDelete(item.id)}
+                  className="text-red-600 text-sm underline mt-1 ml-4"
+                >
+                  削除
+                </button>
+              )}
             </div>
-            {item.summary.length > 50 && (
-              <button
-                onClick={() =>
-                  setExpandedId(expandedId === item.id ? null : item.id)
-                }
-                className="text-sm text-blue-500 underline"
-              >
-                {expandedId === item.id ? '閉じる' : 'もっと見る'}
-              </button>
-            )}
-            {item.title && (
-              <div className="text-xs text-gray-500 mt-1">🎬 {item.title}（投稿日：{item.publishedAt?.split('T')[0]}）</div>
-            )}
-            {user?.email === item.author && (
-              <button
-                onClick={() => item.id && handleDelete(item.id)}
-                className="text-red-600 text-sm underline mt-1"
-              >
-                削除
-              </button>
-            )}
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {user ? (
@@ -219,16 +223,16 @@ export default function ArchivePage() {
           )}
 
           <input
-            value={speaker}
-            onChange={(e) => setSpeaker(e.target.value)}
-            placeholder="発言者名を入力（例：吉川康治議員）"
+            value={councilTitle}
+            onChange={(e) => setCouncilTitle(e.target.value)}
+            placeholder="例：令和6年3月定例会"
             className="w-full border p-2 rounded"
           />
 
           <input
             value={speaker}
             onChange={(e) => setSpeaker(e.target.value)}
-            placeholder="質問者を入力（例：吉川康治議員）"
+            placeholder="発言者名を入力（例：吉川康治議員）"
             className="w-full border p-2 rounded"
           />
 
