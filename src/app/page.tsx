@@ -13,12 +13,12 @@ import {
 } from 'firebase/auth';
 
 const pastMeetings = [
-  '2025年6月定例会一般質問',
-  '2025年3月定例会一般質問',
-  '2024年12月定例会一般質問',
-  '2024年9月定例会一般質問',
-  '2024年6月定例会一般質問',
-  '2024年3月定例会一般質問'
+  '2025年6月定例会',
+  '2025年3月定例会',
+  '2024年12月定例会',
+  '2024年9月定例会',
+  '2024年6月定例会',
+  '2024年3月定例会'
 ];
 
 type Question = {
@@ -44,7 +44,7 @@ export default function ArchivePage() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [videoMeta, setVideoMeta] = useState<{ title: string; publishedAt: string } | null>(null);
   const [previewEntries, setPreviewEntries] = useState<{ timestamp: string; summary: string }[]>([]);
-  const [expandedIds, setExpandedIds] = useState<string[]>([]);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     onAuthStateChanged(auth, (currentUser) => setUser(currentUser));
@@ -145,22 +145,18 @@ export default function ArchivePage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('この投稿を削除しますか？')) return;
-    await deleteDoc(doc(db, 'questions', id));
-    setQuestions(questions.filter((q) => q.id !== id));
+  const handleToggleExpand = (id: string) => {
+    setExpandedIds(prev => {
+      const newSet = new Set(prev);
+      newSet.has(id) ? newSet.delete(id) : newSet.add(id);
+      return newSet;
+    });
   };
 
   const formatYoutubeLink = (url: string, timestamp: string) => {
     const [min, sec] = timestamp.split(':').map(Number);
     const seconds = min * 60 + sec;
     return `${url}&t=${seconds}s`;
-  };
-
-  const toggleExpand = (id: string) => {
-    setExpandedIds((prev) =>
-      prev.includes(id) ? prev.filter(eid => eid !== id) : [...prev, id]
-    );
   };
 
   const filtered = questions.filter((q) =>
@@ -172,6 +168,8 @@ export default function ArchivePage() {
 
   return (
     <main className="p-6 max-w-4xl mx-auto space-y-8">
+      <h1 className="text-2xl font-bold text-center">香美町議会 一般質問アーカイブ検索</h1>
+
       <input
         type="text"
         value={query}
@@ -182,10 +180,11 @@ export default function ArchivePage() {
 
       <div className="space-y-2">
         {filtered.map((item) => {
-          const isExpanded = expandedIds.includes(item.id || '');
-          const lines = item.summary.split('\n');
-          const displaySummary = isExpanded ? item.summary : lines.slice(0, 2).join('\n');
-          const hasMore = lines.length > 2;
+          const isExpanded = expandedIds.has(item.id || '');
+          const summaryLines = item.summary.split('\n');
+          const shortSummary = summaryLines.slice(0, 2).join('\n');
+          const remaining = summaryLines.length > 2;
+
           return (
             <div key={item.id} className="border p-3 rounded bg-white shadow-sm">
               <div className="text-sm text-gray-600">{item.date}｜{item.meeting}｜{item.speaker}</div>
@@ -198,18 +197,16 @@ export default function ArchivePage() {
                 >
                   {item.timestamp}
                 </a>
-                ：{displaySummary}
-                {hasMore && (
-                  <div>
-                    <button
-                      onClick={() => toggleExpand(item.id || '')}
-                      className="text-blue-600 text-sm underline ml-2"
-                    >
-                      {isExpanded ? '閉じる' : 'もっと見る'}
-                    </button>
-                  </div>
-                )}
+                ：{isExpanded || !remaining ? item.summary : shortSummary}
               </div>
+              {remaining && (
+                <button
+                  onClick={() => handleToggleExpand(item.id || '')}
+                  className="text-sm text-blue-600 underline mt-1"
+                >
+                  {isExpanded ? '閉じる' : 'もっと見る'}
+                </button>
+              )}
               {item.title && (
                 <div className="text-xs text-gray-500 mt-1">🎬 {item.title}（投稿日：{item.publishedAt?.split('T')[0]}）</div>
               )}
@@ -228,3 +225,4 @@ export default function ArchivePage() {
     </main>
   );
 }
+
