@@ -22,7 +22,6 @@ type Question = {
   title?: string;
   publishedAt?: string;
   author?: string;
-  meetingLabel?: string;
 };
 
 export default function ArchivePage() {
@@ -31,10 +30,9 @@ export default function ArchivePage() {
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [speaker, setSpeaker] = useState('');
   const [rawInput, setRawInput] = useState('');
-  const [meetingLabel, setMeetingLabel] = useState('');
   const [questions, setQuestions] = useState<Question[]>([]);
   const [videoMeta, setVideoMeta] = useState<{ title: string; publishedAt: string } | null>(null);
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
     onAuthStateChanged(auth, (currentUser) => setUser(currentUser));
@@ -107,7 +105,6 @@ export default function ArchivePage() {
           youtubeUrl,
           title: videoMeta?.title || '',
           publishedAt: videoMeta?.publishedAt || '',
-          meetingLabel: meetingLabel || '',
           createdAt: new Date(),
           author: user?.email || '',
         });
@@ -118,7 +115,6 @@ export default function ArchivePage() {
       setRawInput('');
       setYoutubeUrl('');
       setSpeaker('');
-      setMeetingLabel('');
     } catch (err) {
       console.error(err);
       alert('保存に失敗しました');
@@ -131,17 +127,6 @@ export default function ArchivePage() {
     setQuestions(questions.filter((q) => q.id !== id));
   };
 
-  const toggleExpand = (id?: string) => {
-    if (!id) return;
-    const newSet = new Set(expandedIds);
-    if (newSet.has(id)) {
-      newSet.delete(id);
-    } else {
-      newSet.add(id);
-    }
-    setExpandedIds(newSet);
-  };
-
   const formatYoutubeLink = (url: string, timestamp: string) => {
     const [min, sec] = timestamp.split(':').map(Number);
     const seconds = min * 60 + sec;
@@ -151,8 +136,7 @@ export default function ArchivePage() {
   const filtered = questions.filter((q) =>
     q.speaker.includes(query) ||
     q.date.includes(query) ||
-    q.summary.includes(query) ||
-    q.meetingLabel?.includes(query)
+    q.summary.includes(query)
   );
 
   return (
@@ -172,9 +156,7 @@ export default function ArchivePage() {
       <div className="space-y-2">
         {filtered.map((item) => (
           <div key={item.id} className="border p-3 rounded bg-white shadow-sm">
-            <div className="text-sm text-gray-600">
-              {item.date}｜{item.speaker}｜{item.meetingLabel || '（未記入）'}
-            </div>
+            <div className="text-sm text-gray-600">{item.date}｜{item.speaker}</div>
             <div className="text-md">
               <a
                 href={formatYoutubeLink(item.youtubeUrl, item.timestamp)}
@@ -184,25 +166,22 @@ export default function ArchivePage() {
               >
                 {item.timestamp}
               </a>
-              ：
-              {expandedIds.has(item.id!)
+              ：{expandedId === item.id
                 ? item.summary
-                : item.summary.length > 60
-                  ? item.summary.slice(0, 60) + '...'
-                  : item.summary}
+                : item.summary.slice(0, 50) + (item.summary.length > 50 ? '…' : '')}
             </div>
-            {item.summary.length > 60 && (
+            {item.summary.length > 50 && (
               <button
-                onClick={() => toggleExpand(item.id)}
-                className="text-blue-600 text-sm underline mt-1"
+                onClick={() =>
+                  setExpandedId(expandedId === item.id ? null : item.id)
+                }
+                className="text-sm text-blue-500 underline"
               >
-                {expandedIds.has(item.id!) ? '閉じる' : 'もっと見る'}
+                {expandedId === item.id ? '閉じる' : 'もっと見る'}
               </button>
             )}
             {item.title && (
-              <div className="text-xs text-gray-500 mt-1">
-                🎬 {item.title}（投稿日：{item.publishedAt?.split('T')[0]}）
-              </div>
+              <div className="text-xs text-gray-500 mt-1">🎬 {item.title}（投稿日：{item.publishedAt?.split('T')[0]}）</div>
             )}
             {user?.email === item.author && (
               <button
@@ -247,9 +226,9 @@ export default function ArchivePage() {
           />
 
           <input
-            value={meetingLabel}
-            onChange={(e) => setMeetingLabel(e.target.value)}
-            placeholder="議会の時期を入力（例：2025年3月定例会）"
+            value={speaker}
+            onChange={(e) => setSpeaker(e.target.value)}
+            placeholder="質問者を入力（例：吉川康治議員）"
             className="w-full border p-2 rounded"
           />
 
