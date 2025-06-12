@@ -15,6 +15,7 @@ import {
 type Question = {
   id?: string;
   date: string;
+  gikaiName?: string;
   speaker: string;
   summary: string;
   timestamp: string;
@@ -22,7 +23,6 @@ type Question = {
   title?: string;
   publishedAt?: string;
   author?: string;
-  gikaiDate?: string;
 };
 
 export default function ArchivePage() {
@@ -30,8 +30,8 @@ export default function ArchivePage() {
   const [query, setQuery] = useState('');
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [speaker, setSpeaker] = useState('');
+  const [gikaiName, setGikaiName] = useState('');
   const [rawInput, setRawInput] = useState('');
-  const [gikaiDate, setGikaiDate] = useState('');
   const [questions, setQuestions] = useState<Question[]>([]);
   const [videoMeta, setVideoMeta] = useState<{ title: string; publishedAt: string } | null>(null);
 
@@ -100,6 +100,7 @@ export default function ArchivePage() {
         const [, timestamp, summary] = match;
         await addDoc(collection(db, 'questions'), {
           date: new Date().toISOString().split('T')[0],
+          gikaiName,
           speaker: speaker || '（未入力）',
           summary,
           timestamp: timestamp.replace(/[()]/g, ''),
@@ -108,7 +109,6 @@ export default function ArchivePage() {
           publishedAt: videoMeta?.publishedAt || '',
           createdAt: new Date(),
           author: user?.email || '',
-          gikaiDate: gikaiDate || '',
         });
       });
 
@@ -117,7 +117,7 @@ export default function ArchivePage() {
       setRawInput('');
       setYoutubeUrl('');
       setSpeaker('');
-      setGikaiDate('');
+      setGikaiName('');
     } catch (err) {
       console.error(err);
       alert('保存に失敗しました');
@@ -139,8 +139,11 @@ export default function ArchivePage() {
   const filtered = questions.filter((q) =>
     q.speaker.includes(query) ||
     q.date.includes(query) ||
-    q.summary.includes(query)
+    q.summary.includes(query) ||
+    (q.gikaiName || '').includes(query)
   );
+
+  const uniqueSpeakers = Array.from(new Set(questions.map((q) => q.speaker).filter(Boolean)));
 
   return (
     <main className="p-6 max-w-4xl mx-auto space-y-8">
@@ -152,17 +155,18 @@ export default function ArchivePage() {
         type="text"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="キーワード検索（例：吉川、キャッシュレス）"
+        placeholder="キーワード検索（例：吉川、キャッシュレス、2025年3月）"
         className="w-full border p-2 rounded"
       />
+
+      <div className="text-sm text-gray-600">
+        発言者一覧: {uniqueSpeakers.join(', ')}
+      </div>
 
       <div className="space-y-2">
         {filtered.map((item) => (
           <div key={item.id} className="border p-3 rounded bg-white shadow-sm">
-            <div className="text-sm text-gray-600">{item.date}｜{item.speaker}</div>
-            {item.gikaiDate && (
-              <div className="text-xs text-gray-500">🗓️ 議会：{item.gikaiDate}</div>
-            )}
+            <div className="text-sm text-gray-600">{item.date}｜{item.gikaiName || '（議会名未入力）'}｜{item.speaker}</div>
             <div className="text-md">
               <a
                 href={formatYoutubeLink(item.youtubeUrl, item.timestamp)}
@@ -213,9 +217,9 @@ export default function ArchivePage() {
           )}
 
           <input
-            value={gikaiDate}
-            onChange={(e) => setGikaiDate(e.target.value)}
-            placeholder="議会年月を入力（例：2025年3月）"
+            value={gikaiName}
+            onChange={(e) => setGikaiName(e.target.value)}
+            placeholder="議会名（例：2025年3月定例会）"
             className="w-full border p-2 rounded"
           />
 
@@ -251,3 +255,4 @@ export default function ArchivePage() {
     </main>
   );
 }
+
