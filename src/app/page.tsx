@@ -15,7 +15,6 @@ import {
 type Question = {
   id?: string;
   date: string;
-  meeting: string;
   speaker: string;
   summary: string;
   timestamp: string;
@@ -23,18 +22,19 @@ type Question = {
   title?: string;
   publishedAt?: string;
   author?: string;
+  meetingLabel?: string;
 };
 
 export default function ArchivePage() {
   const [user, setUser] = useState<User | null>(null);
   const [query, setQuery] = useState('');
-  const [meeting, setMeeting] = useState('');
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [speaker, setSpeaker] = useState('');
   const [rawInput, setRawInput] = useState('');
+  const [meetingLabel, setMeetingLabel] = useState('');
   const [questions, setQuestions] = useState<Question[]>([]);
   const [videoMeta, setVideoMeta] = useState<{ title: string; publishedAt: string } | null>(null);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     onAuthStateChanged(auth, (currentUser) => setUser(currentUser));
@@ -51,7 +51,10 @@ export default function ArchivePage() {
 
   useEffect(() => {
     const fetchVideoMeta = async () => {
-      if (!youtubeUrl.includes('watch?v=')) return setVideoMeta(null);
+      if (!youtubeUrl.includes('watch?v=')) {
+        setVideoMeta(null);
+        return;
+      }
       const videoId = new URLSearchParams(new URL(youtubeUrl).search).get('v');
       if (!videoId) return;
 
@@ -60,22 +63,22 @@ export default function ArchivePage() {
           `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${process.env.NEXT_PUBLIC_YOUTUBE_API_KEY}`
         );
         const json = await res.json();
-        if (json.items?.[0]?.snippet) {
-          setVideoMeta({
-            title: json.items[0].snippet.title,
-            publishedAt: json.items[0].snippet.publishedAt,
-          });
+        if (json.items && json.items.length > 0) {
+          const snippet = json.items[0].snippet;
+          setVideoMeta({ title: snippet.title, publishedAt: snippet.publishedAt });
         }
       } catch (err) {
         console.error('YouTube API error:', err);
         setVideoMeta(null);
       }
     };
+
     fetchVideoMeta();
   }, [youtubeUrl]);
 
   const handleLogin = async () => {
-    await signInWithPopup(auth, new GoogleAuthProvider());
+    const provider = new GoogleAuthProvider();
+    await signInWithPopup(auth, provider);
   };
 
   const handleLogout = async () => {
@@ -83,38 +86,39 @@ export default function ArchivePage() {
   };
 
   const handleSubmit = async () => {
-    if (!youtubeUrl.trim() || !rawInput.trim() || !meeting.trim()) {
-      alert('YouTube URL・議会名・要約を入力してください');
+    if (!youtubeUrl.trim() || !rawInput.trim()) {
+      alert('YouTube URLと要約を入力してください');
       return;
     }
 
-    const lines = rawInput.split('\n').map(line => line.trim()).filter(Boolean);
-    const batch = lines.map(async (line) => {
-      const match = line.match(/^(\(?\d+:\d+\)?)[\s　]*(.+)$/);
-      if (!match) return;
-      const timestamp = match[1].replace(/[()]/g, '');
-      const summary = match[2];
-      await addDoc(collection(db, 'questions'), {
-        date: new Date().toISOString().split('T')[0],
-        meeting,
-        speaker: speaker || '（未入力）',
-        summary,
-        timestamp,
-        youtubeUrl,
-        title: videoMeta?.title || '',
-        publishedAt: videoMeta?.publishedAt || '',
-        createdAt: new Date(),
-        author: user?.email || '',
-      });
-    });
+    const lines = rawInput.split('\n').filter(Boolean);
 
     try {
+      const batch = lines.map(async (line) => {
+        const match = line.match(/^(\(?\d+:\d+\)?)\s*(.+)$/);
+        if (!match) return;
+
+        const [_, timestamp, summary] = match;
+        await addDoc(collection(db, 'questions'), {
+          date: new Date().toISOString().split('T')[0],
+          speaker: speaker || '（未入力）',
+          summary,
+          timestamp: timestamp.replace(/[()]/g, ''),
+          youtubeUrl,
+          title: videoMeta?.title || '',
+          publishedAt: videoMeta?.publishedAt || '',
+          meetingLabel: meetingLabel || '',
+          createdAt: new Date(),
+          author: user?.email || '',
+        });
+      });
+
       await Promise.all(batch);
       alert('保存しました');
-      setMeeting('');
+      setRawInput('');
       setYoutubeUrl('');
       setSpeaker('');
-      setRawInput('');
+      setMeetingLabel('');
     } catch (err) {
       console.error(err);
       alert('保存に失敗しました');
@@ -124,7 +128,18 @@ export default function ArchivePage() {
   const handleDelete = async (id: string) => {
     if (!confirm('この投稿を削除しますか？')) return;
     await deleteDoc(doc(db, 'questions', id));
-    setQuestions(questions.filter(q => q.id !== id));
+    setQuestions(questions.filter((q) => q.id !== id));
+  };
+
+  const toggleExpand = (id?: string) => {
+    if (!id) return;
+    const newSet = new Set(expandedIds);
+    if (newSet.has(id)) {
+      newSet.delete(id);
+    } else {
+      newSet.add(id);
+    }
+    setExpandedIds(newSet);
   };
 
   const formatYoutubeLink = (url: string, timestamp: string) => {
@@ -137,7 +152,7 @@ export default function ArchivePage() {
     q.speaker.includes(query) ||
     q.date.includes(query) ||
     q.summary.includes(query) ||
-    q.meeting.includes(query)
+    q.meetingLabel?.includes(query)
   );
 
   return (
@@ -150,7 +165,7 @@ export default function ArchivePage() {
         type="text"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="キーワード検索（例：吉川、キャッシュレス、2025年3月定例会）"
+        placeholder="キーワード検索（例：吉川、キャッシュレス）"
         className="w-full border p-2 rounded"
       />
 
@@ -158,9 +173,9 @@ export default function ArchivePage() {
         {filtered.map((item) => (
           <div key={item.id} className="border p-3 rounded bg-white shadow-sm">
             <div className="text-sm text-gray-600">
-              {item.date}｜{item.meeting}｜{item.speaker}
+              {item.date}｜{item.speaker}｜{item.meetingLabel || '（未記入）'}
             </div>
-            <div className="text-md whitespace-pre-line">
+            <div className="text-md">
               <a
                 href={formatYoutubeLink(item.youtubeUrl, item.timestamp)}
                 target="_blank"
@@ -170,16 +185,18 @@ export default function ArchivePage() {
                 {item.timestamp}
               </a>
               ：
-              {item.summary.length > 50 && expandedId !== item.id
-                ? item.summary.slice(0, 50) + '...'
-                : item.summary}
+              {expandedIds.has(item.id!)
+                ? item.summary
+                : item.summary.length > 60
+                  ? item.summary.slice(0, 60) + '...'
+                  : item.summary}
             </div>
-            {item.summary.length > 50 && (
+            {item.summary.length > 60 && (
               <button
-                onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
-                className="text-sm text-blue-600 underline mt-1"
+                onClick={() => toggleExpand(item.id)}
+                className="text-blue-600 text-sm underline mt-1"
               >
-                {expandedId === item.id ? '閉じる' : 'もっと見る'}
+                {expandedIds.has(item.id!) ? '閉じる' : 'もっと見る'}
               </button>
             )}
             {item.title && (
@@ -211,23 +228,9 @@ export default function ArchivePage() {
           <h2 className="font-semibold text-lg">投稿フォーム（管理者専用）</h2>
 
           <input
-            value={meeting}
-            onChange={(e) => setMeeting(e.target.value)}
-            placeholder="例：2025年6月定例会"
-            className="w-full border p-2 rounded"
-          />
-
-          <input
-            value={speaker}
-            onChange={(e) => setSpeaker(e.target.value)}
-            placeholder="発言者名（例：吉川康治議員）"
-            className="w-full border p-2 rounded"
-          />
-
-          <input
             value={youtubeUrl}
             onChange={(e) => setYoutubeUrl(e.target.value)}
-            placeholder="YouTube URL"
+            placeholder="YouTube URL を入力"
             className="w-full border p-2 rounded"
           />
           {videoMeta && (
@@ -235,6 +238,20 @@ export default function ArchivePage() {
               🎬 {videoMeta.title}（投稿日：{videoMeta.publishedAt.split('T')[0]}）
             </div>
           )}
+
+          <input
+            value={speaker}
+            onChange={(e) => setSpeaker(e.target.value)}
+            placeholder="発言者名を入力（例：吉川康治議員）"
+            className="w-full border p-2 rounded"
+          />
+
+          <input
+            value={meetingLabel}
+            onChange={(e) => setMeetingLabel(e.target.value)}
+            placeholder="議会の時期を入力（例：2025年3月定例会）"
+            className="w-full border p-2 rounded"
+          />
 
           <textarea
             value={rawInput}
