@@ -12,15 +12,13 @@ import {
   User,
 } from 'firebase/auth';
 
-
-// 議会名の型を追加
 const pastMeetings = [
   '2025年6月定例会',
   '2025年3月定例会',
   '2024年12月定例会',
   '2024年9月定例会',
   '2024年6月定例会',
-  '2024年3月定例会',
+  '2024年3月定例会'
 ];
 
 type Question = {
@@ -139,8 +137,7 @@ export default function ArchivePage() {
 
       await Promise.all(batch);
       alert('保存しました');
-      setPreviewEntries([]); // プレビュークリア
-      // 入力を保持しつつ連続投稿を可能にする（reset不要）
+      setPreviewEntries([]);
     } catch (err) {
       console.error(err);
       alert('保存に失敗しました');
