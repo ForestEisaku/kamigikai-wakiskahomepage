@@ -12,10 +12,21 @@ import {
   User,
 } from 'firebase/auth';
 
-// Define question type
+
+// 議会名の型を追加
+const pastMeetings = [
+  '2025年6月定例会'
+  '2025年3月定例会',
+  '2024年12月定例会',
+  '2024年9月定例会',
+  '2024年6月定例会'
+  '2024年3月定例会'
+];
+
 type Question = {
   id?: string;
   date: string;
+  meeting: string;
   speaker: string;
   summary: string;
   timestamp: string;
@@ -23,26 +34,18 @@ type Question = {
   title?: string;
   publishedAt?: string;
   author?: string;
-  session?: string;
 };
 
 export default function ArchivePage() {
   const [user, setUser] = useState<User | null>(null);
   const [query, setQuery] = useState('');
+  const [meeting, setMeeting] = useState('');
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [speaker, setSpeaker] = useState('');
   const [rawInput, setRawInput] = useState('');
   const [questions, setQuestions] = useState<Question[]>([]);
   const [videoMeta, setVideoMeta] = useState<{ title: string; publishedAt: string } | null>(null);
-  const [session, setSession] = useState('');
-  const [error, setError] = useState('');
-
-  const pastSessions = [
-    '2025年3月定例会',
-    '2024年12月定例会',
-    '2024年9月定例会',
-    '2024年6月定例会',
-  ];
+  const [previewEntries, setPreviewEntries] = useState<{ timestamp: string; summary: string }[]>([]);
 
   useEffect(() => {
     onAuthStateChanged(auth, (currentUser) => setUser(currentUser));
@@ -61,7 +64,6 @@ export default function ArchivePage() {
     const fetchVideoMeta = async () => {
       if (!youtubeUrl.includes('watch?v=')) {
         setVideoMeta(null);
-        setError('YouTubeのURL形式が不正です');
         return;
       }
       const videoId = new URLSearchParams(new URL(youtubeUrl).search).get('v');
@@ -75,12 +77,10 @@ export default function ArchivePage() {
         if (json.items && json.items.length > 0) {
           const snippet = json.items[0].snippet;
           setVideoMeta({ title: snippet.title, publishedAt: snippet.publishedAt });
-          setError('');
         }
       } catch (err) {
         console.error('YouTube API error:', err);
         setVideoMeta(null);
-        setError('YouTube動画情報の取得に失敗しました');
       }
     };
 
@@ -97,53 +97,90 @@ export default function ArchivePage() {
   };
 
   const handleSubmit = async () => {
-    if (!youtubeUrl.trim() || !rawInput.trim()) {
-      alert('YouTube URLと要約を入力してください');
+    if (!youtubeUrl.trim() || !rawInput.trim() || !meeting.trim()) {
+      alert('YouTube URL・議会名・要約を入力してください');
       return;
     }
 
-    const lines = rawInput.split('\n').filter(Boolean);
+    const lines = rawInput.split('\n').map(l => l.trim());
+    const entries: { timestamp: string; summary: string }[] = [];
+
+    let current: { timestamp: string; summary: string } | null = null;
+
+    for (const line of lines) {
+      const match = line.match(/^(\(?\d+:\d+\)?)[\s　]*(.+)$/);
+      if (match) {
+        if (current) entries.push(current);
+        current = {
+          timestamp: match[1].replace(/[()]/g, ''),
+          summary: match[2]
+        };
+      } else if (current) {
+        current.summary += '\n' + line;
+      }
+    }
+    if (current) entries.push(current);
 
     try {
-      const batch = lines.map(async (line) => {
-        const match = line.match(/^(\(?\d+:\d+\)?)\s*(.+)$/);
-        if (!match) return;
-
-        const [, timestamp, summary] = match;
+      const batch = entries.map(async (entry) => {
         await addDoc(collection(db, 'questions'), {
           date: new Date().toISOString().split('T')[0],
+          meeting,
           speaker: speaker || '（未入力）',
-          summary,
-          timestamp: timestamp.replace(/[()]/g, ''),
+          summary: entry.summary,
+          timestamp: entry.timestamp,
           youtubeUrl,
           title: videoMeta?.title || '',
           publishedAt: videoMeta?.publishedAt || '',
           createdAt: new Date(),
           author: user?.email || '',
-          session: session || '',
         });
       });
 
       await Promise.all(batch);
       alert('保存しました');
-      // 保持：setRawInput(''); setSpeaker(''); setYoutubeUrl(''); はコメントアウト
+      setPreviewEntries([]); // プレビュークリア
+      // 入力を保持しつつ連続投稿を可能にする（reset不要）
     } catch (err) {
       console.error(err);
       alert('保存に失敗しました');
     }
   };
 
+  const handleClear = () => {
+    setMeeting('');
+    setSpeaker('');
+    setYoutubeUrl('');
+    setRawInput('');
+    setPreviewEntries([]);
+  };
+
+  const handlePreview = () => {
+    const lines = rawInput.split('\n').map(l => l.trim());
+    const entries: { timestamp: string; summary: string }[] = [];
+
+    let current: { timestamp: string; summary: string } | null = null;
+
+    for (const line of lines) {
+      const match = line.match(/^(\(?\d+:\d+\)?)[\s　]*(.+)$/);
+      if (match) {
+        if (current) entries.push(current);
+        current = {
+          timestamp: match[1].replace(/[()]/g, ''),
+          summary: match[2]
+        };
+      } else if (current) {
+        current.summary += '\n' + line;
+      }
+    }
+    if (current) entries.push(current);
+    setPreviewEntries(entries);
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm('この投稿を削除しますか？')) return;
     await deleteDoc(doc(db, 'questions', id));
     setQuestions(questions.filter((q) => q.id !== id));
-  };
-
-  const handleClear = () => {
-    setYoutubeUrl('');
-    setSpeaker('');
-    setRawInput('');
-    setSession('');
   };
 
   const formatYoutubeLink = (url: string, timestamp: string) => {
@@ -156,7 +193,7 @@ export default function ArchivePage() {
     q.speaker.includes(query) ||
     q.date.includes(query) ||
     q.summary.includes(query) ||
-    q.session?.includes(query)
+    q.meeting?.includes(query)
   );
 
   return (
@@ -176,8 +213,8 @@ export default function ArchivePage() {
       <div className="space-y-2">
         {filtered.map((item) => (
           <div key={item.id} className="border p-3 rounded bg-white shadow-sm">
-            <div className="text-sm text-gray-600">{item.date}｜{item.session}｜{item.speaker}</div>
-            <div className="text-md">
+            <div className="text-sm text-gray-600">{item.date}｜{item.meeting}｜{item.speaker}</div>
+            <div className="text-md whitespace-pre-line">
               <a
                 href={formatYoutubeLink(item.youtubeUrl, item.timestamp)}
                 target="_blank"
@@ -215,30 +252,29 @@ export default function ArchivePage() {
           <h2 className="font-semibold text-lg">投稿フォーム（管理者専用）</h2>
 
           <input
-            list="session-list"
-            value={session}
-            onChange={(e) => setSession(e.target.value)}
-            placeholder="【1】議会名（例：2025年3月定例会）"
+            value={meeting}
+            onChange={(e) => setMeeting(e.target.value)}
+            placeholder="議会名（例：2025年3月定例会）"
+            list="meeting-suggestions"
             className="w-full border p-2 rounded"
           />
-          <datalist id="session-list">
-            {pastSessions.map((s) => <option key={s} value={s} />)}
+          <datalist id="meeting-suggestions">
+            {pastMeetings.map((m) => <option key={m} value={m} />)}
           </datalist>
 
           <input
             value={speaker}
             onChange={(e) => setSpeaker(e.target.value)}
-            placeholder="【2】発言者名（例：吉川康治議員）"
+            placeholder="発言者名（例：吉川康治議員）"
             className="w-full border p-2 rounded"
           />
 
           <input
             value={youtubeUrl}
             onChange={(e) => setYoutubeUrl(e.target.value)}
-            placeholder="【3】YouTube URL"
+            placeholder="YouTube URL を入力"
             className="w-full border p-2 rounded"
           />
-          {error && <div className="text-red-600 text-sm">{error}</div>}
           {videoMeta && (
             <div className="text-sm text-gray-600">
               🎬 {videoMeta.title}（投稿日：{videoMeta.publishedAt.split('T')[0]}）
@@ -248,28 +284,44 @@ export default function ArchivePage() {
           <textarea
             value={rawInput}
             onChange={(e) => setRawInput(e.target.value)}
-            placeholder={`【4】タイムスタンプと要約（複数行）\n例：\n0:02 キャッシュレス対応の質問\n2:01 導入状況の回答`}
-            rows={6}
+            placeholder={`タイムスタンプと要約（例：\n0:02 キャッシュレス対応の質問\n2:01 導入状況の回答）\n※複数行要約もOK`}
+            rows={8}
             className="w-full border p-2 rounded"
           />
 
-          <div className="flex gap-4">
-            <button onClick={handleSubmit} className="bg-green-600 text-white px-4 py-2 rounded">
+          <div className="flex gap-2">
+            <button
+              onClick={handleSubmit}
+              className="bg-green-600 text-white px-4 py-2 rounded"
+            >
               投稿（Firestoreに保存）
             </button>
-            <button onClick={handleClear} className="bg-gray-400 text-white px-4 py-2 rounded">
+            <button
+              onClick={handlePreview}
+              className="bg-blue-600 text-white px-4 py-2 rounded"
+            >
+              プレビュー
+            </button>
+            <button
+              onClick={handleClear}
+              className="bg-gray-400 text-white px-4 py-2 rounded"
+            >
               全てクリア
             </button>
           </div>
 
-          <div className="mt-4">
-            <h3 className="font-semibold text-sm mb-2">⏳ プレビュー（投稿前の確認）</h3>
-            <div className="space-y-1 text-sm">
-              {rawInput.split('\n').map((line, idx) => (
-                <div key={idx} className="bg-white border rounded p-1">{line}</div>
-              ))}
+          {previewEntries.length > 0 && (
+            <div className="mt-6 border-t pt-4">
+              <h3 className="font-semibold">プレビュー表示</h3>
+              <ul className="space-y-2">
+                {previewEntries.map((entry, idx) => (
+                  <li key={idx} className="bg-white p-2 rounded border whitespace-pre-line">
+                    <strong>{entry.timestamp}</strong>：{entry.summary}
+                  </li>
+                ))}
+              </ul>
             </div>
-          </div>
+          )}
         </div>
       ) : (
         <div className="text-center">
