@@ -22,6 +22,7 @@ type Question = {
   title?: string;
   publishedAt?: string;
   author?: string;
+  gikaiDate?: string;
 };
 
 export default function ArchivePage() {
@@ -30,6 +31,7 @@ export default function ArchivePage() {
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [speaker, setSpeaker] = useState('');
   const [rawInput, setRawInput] = useState('');
+  const [gikaiDate, setGikaiDate] = useState('');
   const [questions, setQuestions] = useState<Question[]>([]);
   const [videoMeta, setVideoMeta] = useState<{ title: string; publishedAt: string } | null>(null);
 
@@ -106,6 +108,7 @@ export default function ArchivePage() {
           publishedAt: videoMeta?.publishedAt || '',
           createdAt: new Date(),
           author: user?.email || '',
+          gikaiDate: gikaiDate || '',
         });
       });
 
@@ -114,6 +117,7 @@ export default function ArchivePage() {
       setRawInput('');
       setYoutubeUrl('');
       setSpeaker('');
+      setGikaiDate('');
     } catch (err) {
       console.error(err);
       alert('保存に失敗しました');
@@ -156,6 +160,9 @@ export default function ArchivePage() {
         {filtered.map((item) => (
           <div key={item.id} className="border p-3 rounded bg-white shadow-sm">
             <div className="text-sm text-gray-600">{item.date}｜{item.speaker}</div>
+            {item.gikaiDate && (
+              <div className="text-xs text-gray-500">🗓️ 議会：{item.gikaiDate}</div>
+            )}
             <div className="text-md">
               <a
                 href={formatYoutubeLink(item.youtubeUrl, item.timestamp)}
@@ -204,6 +211,13 @@ export default function ArchivePage() {
               🎬 {videoMeta.title}（投稿日：{videoMeta.publishedAt.split('T')[0]}）
             </div>
           )}
+
+          <input
+            value={gikaiDate}
+            onChange={(e) => setGikaiDate(e.target.value)}
+            placeholder="議会年月を入力（例：2025年3月）"
+            className="w-full border p-2 rounded"
+          />
 
           <input
             value={speaker}
