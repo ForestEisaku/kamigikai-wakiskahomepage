@@ -2,7 +2,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { collection, addDoc, getDocs, deleteDoc, doc } from 'firebase/firestore';
+import {
+  collection,
+  addDoc,
+  getDocs,
+  deleteDoc,
+  doc,
+  query,
+  orderBy,
+} from 'firebase/firestore';
 import { db, auth } from '@/lib/firebaseConfig';
 import {
   onAuthStateChanged,
@@ -24,15 +32,16 @@ type Question = {
   title?: string;
   publishedAt?: string;
   author?: string;
+  createdAt?: any;
 };
 
 export default function ArchivePage() {
   const [user, setUser] = useState<User | null>(null);
-  const [query, setQuery] = useState('');
+  const [queryText, setQueryText] = useState('');
+  const [meeting, setMeeting] = useState('');
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [speaker, setSpeaker] = useState('');
   const [questioner, setQuestioner] = useState('');
-  const [meeting, setMeeting] = useState('');
   const [rawInput, setRawInput] = useState('');
   const [questions, setQuestions] = useState<Question[]>([]);
   const [videoMeta, setVideoMeta] = useState<{ title: string; publishedAt: string } | null>(null);
@@ -44,7 +53,8 @@ export default function ArchivePage() {
 
   useEffect(() => {
     const fetchQuestions = async () => {
-      const snapshot = await getDocs(collection(db, 'questions'));
+      const q = query(collection(db, 'questions'), orderBy('createdAt', 'desc'));
+      const snapshot = await getDocs(q);
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Question[];
       setQuestions(data);
     };
@@ -88,12 +98,13 @@ export default function ArchivePage() {
   };
 
   const handleSubmit = async () => {
-    if (!youtubeUrl.trim() || !rawInput.trim() || !meeting.trim() || !questioner.trim()) {
-      alert('必須項目が入力されていません');
+    if (!youtubeUrl.trim() || !rawInput.trim() || !meeting.trim()) {
+      alert('YouTube URL・定例会名・要約を入力してください');
       return;
     }
 
     const lines = rawInput.split('\n').filter(Boolean);
+
     try {
       const batch = lines.map(async (line) => {
         const match = line.match(/^(\(?\d+:\d+\)?)\s*(.+)$/);
@@ -104,7 +115,7 @@ export default function ArchivePage() {
           date: new Date().toISOString().split('T')[0],
           meeting,
           speaker: speaker || '（未入力）',
-          questioner,
+          questioner: questioner || '（未入力）',
           summary,
           timestamp: timestamp.replace(/[()]/g, ''),
           youtubeUrl,
@@ -118,7 +129,7 @@ export default function ArchivePage() {
       await Promise.all(batch);
       alert('保存しました');
       setRawInput('');
-      setSpeaker('');
+      // youtubeUrl, questioner, meetingは保持
     } catch (err) {
       console.error(err);
       alert('保存に失敗しました');
@@ -138,11 +149,11 @@ export default function ArchivePage() {
   };
 
   const filtered = questions.filter((q) =>
-    q.speaker.includes(query) ||
-    q.date.includes(query) ||
-    q.summary.includes(query) ||
-    q.meeting?.includes(query) ||
-    q.questioner?.includes(query)
+    q.speaker.includes(queryText) ||
+    q.questioner?.includes(queryText) ||
+    q.date.includes(queryText) ||
+    q.summary.includes(queryText) ||
+    q.meeting?.includes(queryText)
   );
 
   return (
@@ -153,9 +164,9 @@ export default function ArchivePage() {
 
       <input
         type="text"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="キーワード検索（例：吉川、キャッシュレス）"
+        value={queryText}
+        onChange={(e) => setQueryText(e.target.value)}
+        placeholder="キーワード検索（例：〇〇議員、キャッシュレス、子育て、2025年3月定例会）"
         className="w-full border p-2 rounded"
       />
 
@@ -173,14 +184,16 @@ export default function ArchivePage() {
                 {item.timestamp}
               </a>
               ：
-              {item.summary.length > 50 && expandedId !== item.id
-                ? item.summary.slice(0, 50) + '...'
-                : item.summary}
+              {expandedId === item.id
+                ? item.summary
+                : item.summary.length > 50
+                  ? item.summary.slice(0, 50) + '...'
+                  : item.summary}
             </div>
             {item.summary.length > 50 && (
               <button
                 className="text-blue-500 text-sm underline mt-1"
-                onClick={() => setExpandedId(expandedId === item.id ? null : item.id || null)}
+                onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
               >
                 {expandedId === item.id ? '閉じる' : 'もっと見る'}
               </button>
@@ -224,13 +237,6 @@ export default function ArchivePage() {
           )}
 
           <input
-            value={questioner}
-            onChange={(e) => setQuestioner(e.target.value)}
-            placeholder="質問者名を入力（誰の一般質問か）"
-            className="w-full border p-2 rounded"
-          />
-
-          <input
             value={meeting}
             onChange={(e) => setMeeting(e.target.value)}
             placeholder="何年何月定例会かを入力（例：2025年6月定例会）"
@@ -238,9 +244,16 @@ export default function ArchivePage() {
           />
 
           <input
+            value={questioner}
+            onChange={(e) => setQuestioner(e.target.value)}
+            placeholder="誰の一般質問か（例：吉川康治議員）"
+            className="w-full border p-2 rounded"
+          />
+
+          <input
             value={speaker}
             onChange={(e) => setSpeaker(e.target.value)}
-            placeholder="発言者名を入力（例：町長）"
+            placeholder="発言者名（例：町長）"
             className="w-full border p-2 rounded"
           />
 
