@@ -34,7 +34,6 @@ export default function ArchivePage() {
   const [rawInput, setRawInput] = useState('');
   const [questions, setQuestions] = useState<Question[]>([]);
   const [videoMeta, setVideoMeta] = useState<{ title: string; publishedAt: string } | null>(null);
-  const [expandedIds, setExpandedIds] = useState<string[]>([]);
 
   useEffect(() => {
     onAuthStateChanged(auth, (currentUser) => setUser(currentUser));
@@ -43,7 +42,7 @@ export default function ArchivePage() {
   useEffect(() => {
     const fetchQuestions = async () => {
       const snapshot = await getDocs(collection(db, 'questions'));
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Question[];
+      const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Question[];
       setQuestions(data);
     };
     fetchQuestions();
@@ -98,7 +97,9 @@ export default function ArchivePage() {
         const match = line.match(/^(\(?\d+:\d+\)?)\s*(.+)$/);
         if (!match) return;
 
-        const [, timestamp, summary] = match;
+        const timestamp = match[1];
+        const summary = match[2];
+
         await addDoc(collection(db, 'questions'), {
           date: new Date().toISOString().split('T')[0],
           questioner: questioner || '（未入力）',
@@ -137,17 +138,12 @@ export default function ArchivePage() {
     return `${url}&t=${seconds}s`;
   };
 
-  const toggleExpand = (id: string) => {
-    setExpandedIds((prev) =>
-      prev.includes(id) ? prev.filter((eid) => eid !== id) : [...prev, id]
-    );
-  };
-
-  const filtered = questions.filter((q) =>
-    q.speaker.includes(query) ||
-    q.questioner.includes(query) ||
-    q.date.includes(query) ||
-    q.summary.includes(query)
+  const filtered = questions.filter(
+    (q) =>
+      q.speaker.includes(query) ||
+      q.questioner.includes(query) ||
+      q.date.includes(query) ||
+      q.summary.includes(query)
   );
 
   return (
@@ -160,14 +156,16 @@ export default function ArchivePage() {
         type="text"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="キーワード検索（例：〇〇議員、子育て、キャッシュレス）"
+        placeholder="キーワード検索（例：吉川、キャッシュレス）"
         className="w-full border p-2 rounded"
       />
 
       <div className="space-y-2">
         {filtered.map((item) => (
           <div key={item.id} className="border p-3 rounded bg-white shadow-sm">
-            <div className="text-sm text-gray-600">{item.date}｜{item.questioner}｜{item.speaker}</div>
+            <div className="text-sm text-gray-600">
+              {item.date}｜質問者：{item.questioner}｜発言者：{item.speaker}
+            </div>
             <div className="text-md">
               <a
                 href={formatYoutubeLink(item.youtubeUrl, item.timestamp)}
@@ -177,20 +175,12 @@ export default function ArchivePage() {
               >
                 {item.timestamp}
               </a>
-              ：{expandedIds.includes(item.id!)
-                ? item.summary
-                : item.summary.slice(0, 40) + (item.summary.length > 40 ? '…' : '')}
+              ：{item.summary}
             </div>
-            {item.summary.length > 40 && (
-              <button
-                onClick={() => toggleExpand(item.id!)}
-                className="text-xs text-blue-500 underline"
-              >
-                {expandedIds.includes(item.id!) ? '閉じる' : 'もっと見る'}
-              </button>
-            )}
             {item.title && (
-              <div className="text-xs text-gray-500 mt-1">🎬 {item.title}（投稿日：{item.publishedAt?.split('T')[0]}）</div>
+              <div className="text-xs text-gray-500 mt-1">
+                🎬 {item.title}（投稿日：{item.publishedAt?.split('T')[0]}）
+              </div>
             )}
             {user?.email === item.author && (
               <button
@@ -230,7 +220,7 @@ export default function ArchivePage() {
           <input
             value={questioner}
             onChange={(e) => setQuestioner(e.target.value)}
-            placeholder="誰の一般質問か（例：吉川康治議員）"
+            placeholder="誰の一般質問かを入力（例：吉川康治議員）"
             className="w-full border p-2 rounded"
           />
 
