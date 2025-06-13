@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { collection, addDoc, getDocs, deleteDoc, doc, Timestamp, query, orderBy } from 'firebase/firestore';
+import { collection, addDoc, getDocs, deleteDoc, doc, query as firestoreQuery, orderBy } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebaseConfig';
 import {
   onAuthStateChanged,
@@ -33,11 +33,10 @@ type Question = {
   title?: string;
   publishedAt?: string;
   author?: string;
-  createdAt?: Timestamp;
 };
+
 export default function ArchivePage() {
   const [user, setUser] = useState<User | null>(null);
-  const [query, setQuery] = useState('');
   const [meeting, setMeeting] = useState('');
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [speaker, setSpeaker] = useState('');
@@ -54,14 +53,15 @@ export default function ArchivePage() {
 
   useEffect(() => {
     const fetchQuestions = async () => {
-      const q = query(collection(db, 'questions'), orderBy('createdAt', 'desc'));
+      const q = firestoreQuery(collection(db, 'questions'), orderBy('createdAt', 'desc'));
       const snapshot = await getDocs(q);
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Question[];
       setQuestions(data);
     };
     fetchQuestions();
   }, []);
-   useEffect(() => {
+
+  useEffect(() => {
     const fetchVideoMeta = async () => {
       if (!youtubeUrl.includes('watch?v=')) {
         setVideoMeta(null);
@@ -96,9 +96,10 @@ export default function ArchivePage() {
   const handleLogout = async () => {
     await signOut(auth);
   };
-   const handleSubmit = async () => {
+
+  const handleSubmit = async () => {
     if (!youtubeUrl.trim() || !rawInput.trim() || !meeting.trim()) {
-      alert('YouTube URL・定例会・要約を入力してください');
+      alert('YouTube URL・議会名・要約を入力してください');
       return;
     }
 
@@ -133,7 +134,7 @@ export default function ArchivePage() {
           youtubeUrl,
           title: videoMeta?.title || '',
           publishedAt: videoMeta?.publishedAt || '',
-          createdAt: Timestamp.now(),
+          createdAt: new Date(),
           author: user?.email || '',
         });
       });
@@ -141,20 +142,17 @@ export default function ArchivePage() {
       await Promise.all(batch);
       alert('保存しました');
       setPreviewEntries([]);
-      setSpeaker('');
-      setRawInput('');
     } catch (err) {
       console.error(err);
       alert('保存に失敗しました');
     }
   };
-   const handleClear = () => {
-    setMeeting('');
+
+  const handleClear = () => {
+    // 入力は一部保持
     setSpeaker('');
-    setYoutubeUrl('');
     setRawInput('');
     setPreviewEntries([]);
-    setQuestioner('');
   };
 
   const handlePreview = () => {
@@ -190,12 +188,6 @@ export default function ArchivePage() {
     const seconds = min * 60 + sec;
     return `${url}&t=${seconds}s`;
   };
-  const filtered = questions.filter((q) =>
-    q.speaker.includes(query) ||
-    q.date.includes(query) ||
-    q.summary.includes(query) ||
-    q.meeting?.includes(query)
-  );
 
   return (
     <main className="p-6 max-w-4xl mx-auto space-y-8">
@@ -203,120 +195,132 @@ export default function ArchivePage() {
         <h1 className="text-2xl font-bold">香美町議会 一般質問アーカイブ検索</h1>
       </div>
 
-      <input
-        type="text"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="キーワード検索（例：吉川、キャッシュレス、2025年3月定例会）"
-        className="w-full border p-2 rounded"
-      />
-
-      <div className="space-y-2">
-        {filtered.map((item) => (
-          <div key={item.id} className="border p-3 rounded bg-white shadow-sm">
-            <div className="text-sm text-gray-600">{item.date}｜{item.meeting}｜{item.speaker}（{item.questioner}）</div>
-            <div className="text-md whitespace-pre-line">
-              <a
-                href={formatYoutubeLink(item.youtubeUrl, item.timestamp)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 underline"
-              >
-                {item.timestamp}
-              </a>
-              ：
-              {expandedId === item.id
-                ? item.summary
-                : item.summary.length > 50
+      <div className="space-y-4">
+        <div className="space-y-2">
+          {questions.map((item) => (
+            <div key={item.id} className="border p-3 rounded bg-white shadow-sm">
+              <div className="text-sm text-gray-600">
+                {item.date}｜{item.meeting}｜{item.questioner}｜{item.speaker}
+              </div>
+              <div className="text-md whitespace-pre-line">
+                <a
+                  href={formatYoutubeLink(item.youtubeUrl, item.timestamp)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 underline"
+                >
+                  {item.timestamp}
+                </a>
+                ：
+                {item.summary.length > 50 && expandedId !== item.id
                   ? item.summary.slice(0, 50) + '...'
                   : item.summary}
-            </div>
-            {item.summary.length > 50 && (
-              <button
-                className="text-blue-500 text-sm underline mt-1"
-                onClick={() => setExpandedId(expandedId === item.id ? null : item.id!)}
-              >
-                {expandedId === item.id ? '閉じる' : 'もっと見る'}
-              </button>
-            )}
-            {item.title && (
-              <div className="text-xs text-gray-500 mt-1">🎬 {item.title}（投稿日：{item.publishedAt?.split('T')[0]}）</div>
-            )}
-            {user?.email === item.author && (
-              <button
-                onClick={() => item.id && handleDelete(item.id)}
-                className="text-red-600 text-sm underline mt-1"
-              >
-                削除
-              </button>
-            )}
-          </div>
-        ))}
-      </div>
-            {user ? (
-        <div className="space-y-4 border-t pt-6 mt-6">
-          <h2 className="text-lg font-bold">一般質問の投稿（ログイン済）</h2>
-
-          <select value={meeting} onChange={(e) => setMeeting(e.target.value)} className="w-full border p-2 rounded">
-            <option value="">何年何月の定例会かを選択</option>
-            {pastMeetings.map((m) => (
-              <option key={m} value={m}>{m}</option>
-            ))}
-          </select>
-
-          <input
-            type="text"
-            value={questioner}
-            onChange={(e) => setQuestioner(e.target.value)}
-            placeholder="誰の一般質問か（質問者）"
-            className="w-full border p-2 rounded"
-          />
-          <input
-            type="text"
-            value={speaker}
-            onChange={(e) => setSpeaker(e.target.value)}
-            placeholder="この発言の発言者"
-            className="w-full border p-2 rounded"
-          />
-          <input
-            type="text"
-            value={youtubeUrl}
-            onChange={(e) => setYoutubeUrl(e.target.value)}
-            placeholder="YouTubeのURL（https://www.youtube.com/watch?v=...）"
-            className="w-full border p-2 rounded"
-          />
-          <textarea
-            value={rawInput}
-            onChange={(e) => setRawInput(e.target.value)}
-            placeholder="タイムスタンプ＋要約（例：0:12 町長による答弁）"
-            rows={6}
-            className="w-full border p-2 rounded"
-          />
-          <div className="flex gap-2">
-            <button onClick={handlePreview} className="bg-gray-200 px-3 py-1 rounded">プレビュー</button>
-            <button onClick={handleSubmit} className="bg-blue-500 text-white px-3 py-1 rounded">保存</button>
-            <button onClick={handleClear} className="bg-red-200 px-3 py-1 rounded">入力クリア</button>
-            <button onClick={handleLogout} className="text-sm text-gray-600 underline ml-auto">ログアウト</button>
-          </div>
-
-          {previewEntries.length > 0 && (
-            <div className="border-t pt-4 space-y-2">
-              <h3 className="font-bold">プレビュー</h3>
-              {previewEntries.map((entry, idx) => (
-                <div key={idx} className="text-sm whitespace-pre-line">
-                  <strong>{entry.timestamp}</strong>：{entry.summary}
+              </div>
+              {item.summary.length > 50 && (
+                <button
+                  className="text-blue-500 text-sm underline mt-1"
+                  onClick={() => setExpandedId(expandedId === item.id ? null : item.id!)}
+                >
+                  {expandedId === item.id ? '閉じる' : 'もっと見る'}
+                </button>
+              )}
+              {item.title && (
+                <div className="text-xs text-gray-500 mt-1">
+                  🎬 {item.title}（投稿日：{item.publishedAt?.split('T')[0]}）
                 </div>
-              ))}
+              )}
+              {user?.email === item.author && (
+                <button
+                  onClick={() => item.id && handleDelete(item.id)}
+                  className="text-red-600 text-sm underline mt-1"
+                >
+                  削除
+                </button>
+              )}
             </div>
-          )}
+          ))}
         </div>
-      ) : (
-        <div className="text-center mt-8">
-          <button onClick={handleLogin} className="bg-green-500 text-white px-4 py-2 rounded">
-            Googleでログインして投稿
-          </button>
-        </div>
-      )}
+
+        {user ? (
+          <>
+            <div className="space-y-2">
+              <select
+                value={meeting}
+                onChange={(e) => setMeeting(e.target.value)}
+                className="w-full border p-2 rounded"
+              >
+                <option value="">何年何月定例会か選択</option>
+                {pastMeetings.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+              <input
+                type="text"
+                placeholder="YouTube URL"
+                value={youtubeUrl}
+                onChange={(e) => setYoutubeUrl(e.target.value)}
+                className="w-full border p-2 rounded"
+              />
+              <input
+                type="text"
+                placeholder="質問者名"
+                value={questioner}
+                onChange={(e) => setQuestioner(e.target.value)}
+                className="w-full border p-2 rounded"
+              />
+              <input
+                type="text"
+                placeholder="発言者名"
+                value={speaker}
+                onChange={(e) => setSpeaker(e.target.value)}
+                className="w-full border p-2 rounded"
+              />
+              <textarea
+                value={rawInput}
+                onChange={(e) => setRawInput(e.target.value)}
+                placeholder="タイムスタンプと要約（例: 0:15 発言内容）"
+                className="w-full border p-2 rounded h-40"
+              />
+              <div className="flex space-x-2">
+                <button onClick={handlePreview} className="bg-blue-500 text-white px-4 py-2 rounded">
+                  プレビュー
+                </button>
+                <button onClick={handleSubmit} className="bg-green-500 text-white px-4 py-2 rounded">
+                  保存
+                </button>
+                <button onClick={handleClear} className="bg-gray-300 text-black px-4 py-2 rounded">
+                  クリア
+                </button>
+                <button onClick={handleLogout} className="text-red-500 underline px-4 py-2">
+                  ログアウト
+                </button>
+              </div>
+            </div>
+            <div>
+              {previewEntries.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  <h2 className="font-semibold">プレビュー一覧</h2>
+                  {previewEntries.map((entry, idx) => (
+                    <div key={idx} className="border p-2 rounded">
+                      <div className="text-sm font-bold">{entry.timestamp}</div>
+                      <div className="whitespace-pre-line text-sm">{entry.summary}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="text-center">
+            <button
+              onClick={handleLogin}
+              className="bg-blue-500 text-white px-4 py-2 rounded"
+            >
+              Googleでログイン
+            </button>
+          </div>
+        )}
+      </div>
     </main>
   );
 }
