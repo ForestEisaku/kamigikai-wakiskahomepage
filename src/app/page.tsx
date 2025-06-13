@@ -15,9 +15,8 @@ import {
 type Question = {
   id?: string;
   date: string;
-  meetingDate: string;
+  meeting: string;
   speaker: string;
-  questioner: string;
   summary: string;
   timestamp: string;
   youtubeUrl: string;
@@ -29,10 +28,9 @@ type Question = {
 export default function ArchivePage() {
   const [user, setUser] = useState<User | null>(null);
   const [query, setQuery] = useState('');
+  const [meeting, setMeeting] = useState('');
   const [youtubeUrl, setYoutubeUrl] = useState('');
-  const [meetingDate, setMeetingDate] = useState('');
   const [speaker, setSpeaker] = useState('');
-  const [questioner, setQuestioner] = useState('');
   const [rawInput, setRawInput] = useState('');
   const [questions, setQuestions] = useState<Question[]>([]);
   const [videoMeta, setVideoMeta] = useState<{ title: string; publishedAt: string } | null>(null);
@@ -88,24 +86,22 @@ export default function ArchivePage() {
   };
 
   const handleSubmit = async () => {
-    if (!youtubeUrl.trim() || !rawInput.trim()) {
-      alert('YouTube URLと要約を入力してください');
+    if (!youtubeUrl.trim() || !rawInput.trim() || !meeting.trim()) {
+      alert('YouTube URL・議会名・要約を入力してください');
       return;
     }
 
     const lines = rawInput.split('\n').filter(Boolean);
-
     try {
       const batch = lines.map(async (line) => {
         const match = line.match(/^(\(?\d+:\d+\)?)\s*(.+)$/);
         if (!match) return;
 
-        const [timestamp, summary] = match;
+        const [_, timestamp, summary] = match;
         await addDoc(collection(db, 'questions'), {
           date: new Date().toISOString().split('T')[0],
-          meetingDate: meetingDate || '',
+          meeting,
           speaker: speaker || '（未入力）',
-          questioner: questioner || '（未入力）',
           summary,
           timestamp: timestamp.replace(/[()]/g, ''),
           youtubeUrl,
@@ -120,9 +116,8 @@ export default function ArchivePage() {
       alert('保存しました');
       setRawInput('');
       setYoutubeUrl('');
-      setMeetingDate('');
+      setMeeting('');
       setSpeaker('');
-      setQuestioner('');
     } catch (err) {
       console.error(err);
       alert('保存に失敗しました');
@@ -143,10 +138,9 @@ export default function ArchivePage() {
 
   const filtered = questions.filter((q) =>
     q.speaker.includes(query) ||
-    q.questioner.includes(query) ||
-    q.meetingDate.includes(query) ||
     q.date.includes(query) ||
-    q.summary.includes(query)
+    q.summary.includes(query) ||
+    q.meeting?.includes(query)
   );
 
   return (
@@ -159,56 +153,49 @@ export default function ArchivePage() {
         type="text"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="キーワード検索（例：吉川、キャッシュレス）"
+        placeholder="キーワード検索（例：吉川、キャッシュレス、2025年3月定例会）"
         className="w-full border p-2 rounded"
       />
 
       <div className="space-y-2">
-        {filtered.map((item) => {
-          const isExpanded = expandedId === item.id;
-          const displayText = item.summary.length > 50 && !isExpanded
-            ? `${item.summary.slice(0, 50)}...`
-            : item.summary;
-          return (
-            <div key={item.id} className="border p-3 rounded bg-white shadow-sm">
-              <div className="text-sm text-gray-600">{item.meetingDate}｜{item.questioner}｜{item.speaker}</div>
-              <div className="text-md">
-                <a
-                  href={formatYoutubeLink(item.youtubeUrl, item.timestamp)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 underline"
-                >
-                  {item.timestamp}
-                </a>
-                ：{displayText}
-                {item.summary.length > 50 && (
-                  <button
-                    onClick={() =>
-                      setExpandedId(isExpanded ? null : item.id || null)
-                    }
-                    className="ml-2 text-sm text-blue-500"
-                  >
-                    {isExpanded ? '閉じる' : 'もっと見る'}
-                  </button>
-                )}
-              </div>
-              {item.title && (
-                <div className="text-xs text-gray-500 mt-1">
-                  🎬 {item.title}（投稿日：{item.publishedAt?.split('T')[0]}）
-                </div>
-              )}
-              {user?.email === item.author && (
-                <button
-                  onClick={() => item.id && handleDelete(item.id)}
-                  className="text-red-600 text-sm underline mt-1"
-                >
-                  削除
-                </button>
-              )}
+        {filtered.map((item) => (
+          <div key={item.id} className="border p-3 rounded bg-white shadow-sm">
+            <div className="text-sm text-gray-600">{item.date}｜{item.meeting}｜{item.speaker}</div>
+            <div className="text-md">
+              <a
+                href={formatYoutubeLink(item.youtubeUrl, item.timestamp)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 underline"
+              >
+                {item.timestamp}
+              </a>
+              ：
+              {expandedId === item.id || item.summary.length <= 50
+                ? item.summary
+                : item.summary.slice(0, 50) + '...'}
             </div>
-          );
-        })}
+            {item.summary.length > 50 && (
+              <button
+                className="text-blue-500 text-sm underline mt-1"
+                onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
+              >
+                {expandedId === item.id ? '閉じる' : 'もっと見る'}
+              </button>
+            )}
+            {item.title && (
+              <div className="text-xs text-gray-500 mt-1">🎬 {item.title}（投稿日：{item.publishedAt?.split('T')[0]}）</div>
+            )}
+            {user?.email === item.author && (
+              <button
+                onClick={() => item.id && handleDelete(item.id)}
+                className="text-red-600 text-sm underline mt-1"
+              >
+                削除
+              </button>
+            )}
+          </div>
+        ))}
       </div>
 
       {user ? (
@@ -223,6 +210,13 @@ export default function ArchivePage() {
           <h2 className="font-semibold text-lg">投稿フォーム（管理者専用）</h2>
 
           <input
+            value={meeting}
+            onChange={(e) => setMeeting(e.target.value)}
+            placeholder="例：2025年6月定例会"
+            className="w-full border p-2 rounded"
+          />
+
+          <input
             value={youtubeUrl}
             onChange={(e) => setYoutubeUrl(e.target.value)}
             placeholder="YouTube URL を入力"
@@ -235,21 +229,9 @@ export default function ArchivePage() {
           )}
 
           <input
-            value={meetingDate}
-            onChange={(e) => setMeetingDate(e.target.value)}
-            placeholder="何年何月定例会か（例：2025年6月定例会）"
-            className="w-full border p-2 rounded"
-          />
-          <input
-            value={questioner}
-            onChange={(e) => setQuestioner(e.target.value)}
-            placeholder="誰の一般質問か（例：吉川康治）"
-            className="w-full border p-2 rounded"
-          />
-          <input
             value={speaker}
             onChange={(e) => setSpeaker(e.target.value)}
-            placeholder="発言者名（例：町長）"
+            placeholder="発言者名を入力（例：吉川康治議員）"
             className="w-full border p-2 rounded"
           />
 
