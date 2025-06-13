@@ -96,7 +96,7 @@ export default function ArchivePage() {
       const match = line.match(/^(\(?\d+:\d+\)?)\s*(.+)$/);
       if (!match) return;
 
-      const [_, timestamp, summary] = match;
+      const [, timestamp, summary] = match;
       await addDoc(collection(db, 'questions'), {
         date: new Date().toISOString().split('T')[0],
         meeting,
