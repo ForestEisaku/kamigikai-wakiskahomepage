@@ -220,7 +220,7 @@ export default function ArchivePage() {
             <div className="text-sm text-gray-600">
               {item.date}｜{item.meeting}｜{item.questioner}｜{item.speaker}
             </div>
-            <div className="text-md whitespace-pre-line text-sm sm:text-base leading-relaxed text-gray-800">
+            <div className="text-md whitespace-pre-line text-sm sm:text-base leading-relaxed text-gray-900">
               <a
                 href={formatYoutubeLink(item.youtubeUrl, item.timestamp)}
                 target="_blank"
