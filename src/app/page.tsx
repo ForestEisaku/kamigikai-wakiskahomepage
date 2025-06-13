@@ -201,7 +201,7 @@ export default function ArchivePage() {
   return (
     <main className="p-6 max-w-4xl mx-auto space-y-8">
       <div className="text-center">
-        <h1 className="text-2xl font-bold">香美町一般質問アーカイブ　</h1>
+        <h1 className="text-2xl font-bold">香美町一般質問アーカイブ</h1>
       </div>
 
       <div className="mt-4">
