@@ -17,6 +17,7 @@ type Question = {
   date: string;
   meeting: string;
   speaker: string;
+  questioner: string;
   summary: string;
   timestamp: string;
   youtubeUrl: string;
@@ -28,9 +29,10 @@ type Question = {
 export default function ArchivePage() {
   const [user, setUser] = useState<User | null>(null);
   const [query, setQuery] = useState('');
-  const [meeting, setMeeting] = useState('');
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [speaker, setSpeaker] = useState('');
+  const [questioner, setQuestioner] = useState('');
+  const [meeting, setMeeting] = useState('');
   const [rawInput, setRawInput] = useState('');
   const [questions, setQuestions] = useState<Question[]>([]);
   const [videoMeta, setVideoMeta] = useState<{ title: string; publishedAt: string } | null>(null);
@@ -86,38 +88,37 @@ export default function ArchivePage() {
   };
 
   const handleSubmit = async () => {
-    if (!youtubeUrl.trim() || !rawInput.trim() || !meeting.trim()) {
-      alert('YouTube URL・議会名・要約を入力してください');
+    if (!youtubeUrl.trim() || !rawInput.trim() || !meeting.trim() || !questioner.trim()) {
+      alert('必須項目が入力されていません');
       return;
     }
 
-    const lines = rawInput.split('\n').map(line => line.trim()).filter(Boolean);
-    const batch = lines.map(async (line) => {
-      const match = line.match(/^(\(?\d+:\d+\)?)\s*(.+)$/);
-      if (!match) return;
-
-      const [, timestamp, summary] = match;
-      await addDoc(collection(db, 'questions'), {
-        date: new Date().toISOString().split('T')[0],
-        meeting,
-        speaker: speaker || '（未入力）',
-        summary,
-        timestamp: timestamp.replace(/[()]/g, ''),
-        youtubeUrl,
-        title: videoMeta?.title || '',
-        publishedAt: videoMeta?.publishedAt || '',
-        createdAt: new Date(),
-        author: user?.email || '',
-      });
-    });
-
+    const lines = rawInput.split('\n').filter(Boolean);
     try {
+      const batch = lines.map(async (line) => {
+        const match = line.match(/^(\(?\d+:\d+\)?)\s*(.+)$/);
+        if (!match) return;
+
+        const [, timestamp, summary] = match;
+        await addDoc(collection(db, 'questions'), {
+          date: new Date().toISOString().split('T')[0],
+          meeting,
+          speaker: speaker || '（未入力）',
+          questioner,
+          summary,
+          timestamp: timestamp.replace(/[()]/g, ''),
+          youtubeUrl,
+          title: videoMeta?.title || '',
+          publishedAt: videoMeta?.publishedAt || '',
+          createdAt: new Date(),
+          author: user?.email || '',
+        });
+      });
+
       await Promise.all(batch);
       alert('保存しました');
       setRawInput('');
-      setYoutubeUrl('');
       setSpeaker('');
-      setMeeting('');
     } catch (err) {
       console.error(err);
       alert('保存に失敗しました');
@@ -140,7 +141,8 @@ export default function ArchivePage() {
     q.speaker.includes(query) ||
     q.date.includes(query) ||
     q.summary.includes(query) ||
-    q.meeting?.includes(query)
+    q.meeting?.includes(query) ||
+    q.questioner?.includes(query)
   );
 
   return (
@@ -160,8 +162,8 @@ export default function ArchivePage() {
       <div className="space-y-2">
         {filtered.map((item) => (
           <div key={item.id} className="border p-3 rounded bg-white shadow-sm">
-            <div className="text-sm text-gray-600">{item.date}｜{item.meeting}｜{item.speaker}</div>
-            <div className="text-md">
+            <div className="text-sm text-gray-600">{item.date}｜{item.meeting}｜{item.questioner}｜{item.speaker}</div>
+            <div className="text-md whitespace-pre-line">
               <a
                 href={formatYoutubeLink(item.youtubeUrl, item.timestamp)}
                 target="_blank"
@@ -171,16 +173,14 @@ export default function ArchivePage() {
                 {item.timestamp}
               </a>
               ：
-              {expandedId === item.id
-                ? item.summary
-                : item.summary.length > 50
-                  ? item.summary.slice(0, 50) + '...'
-                  : item.summary}
+              {item.summary.length > 50 && expandedId !== item.id
+                ? item.summary.slice(0, 50) + '...'
+                : item.summary}
             </div>
             {item.summary.length > 50 && (
               <button
                 className="text-blue-500 text-sm underline mt-1"
-                onClick={() => setExpandedId(expandedId === (item.id ?? '') ? null : item.id ?? '')}
+                onClick={() => setExpandedId(expandedId === item.id ? null : item.id || null)}
               >
                 {expandedId === item.id ? '閉じる' : 'もっと見る'}
               </button>
@@ -212,12 +212,6 @@ export default function ArchivePage() {
           <h2 className="font-semibold text-lg">投稿フォーム（管理者専用）</h2>
 
           <input
-            value={meeting}
-            onChange={(e) => setMeeting(e.target.value)}
-            placeholder="何年何月定例会か（例：2025年6月定例会）"
-            className="w-full border p-2 rounded"
-          />
-          <input
             value={youtubeUrl}
             onChange={(e) => setYoutubeUrl(e.target.value)}
             placeholder="YouTube URL を入力"
@@ -228,12 +222,28 @@ export default function ArchivePage() {
               🎬 {videoMeta.title}（投稿日：{videoMeta.publishedAt.split('T')[0]}）
             </div>
           )}
+
+          <input
+            value={questioner}
+            onChange={(e) => setQuestioner(e.target.value)}
+            placeholder="質問者名を入力（誰の一般質問か）"
+            className="w-full border p-2 rounded"
+          />
+
+          <input
+            value={meeting}
+            onChange={(e) => setMeeting(e.target.value)}
+            placeholder="何年何月定例会かを入力（例：2025年6月定例会）"
+            className="w-full border p-2 rounded"
+          />
+
           <input
             value={speaker}
             onChange={(e) => setSpeaker(e.target.value)}
-            placeholder="発言者名を入力（例：吉川康治議員）"
+            placeholder="発言者名を入力（例：町長）"
             className="w-full border p-2 rounded"
           />
+
           <textarea
             value={rawInput}
             onChange={(e) => setRawInput(e.target.value)}
@@ -241,6 +251,7 @@ export default function ArchivePage() {
             rows={6}
             className="w-full border p-2 rounded"
           />
+
           <button
             onClick={handleSubmit}
             className="bg-green-600 text-white px-4 py-2 rounded"
