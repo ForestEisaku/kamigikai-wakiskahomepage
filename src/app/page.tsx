@@ -217,7 +217,7 @@ export default function ArchivePage() {
       <div className="space-y-4">
         {filteredQuestions.map((item) => (
           <div key={item.id} className="border p-3 rounded bg-white shadow-sm">
-            <div className="text-sm text-gray-600">
+            <div className="text-sm  text-gray-900">
               {item.date}｜{item.meeting}｜{item.questioner}｜{item.speaker}
             </div>
             <div className="text-md whitespace-pre-line text-sm sm:text-base leading-relaxed text-gray-900">
@@ -243,7 +243,7 @@ export default function ArchivePage() {
               </button>
             )}
             {item.title && (
-              <div className="text-xs text-gray-500 mt-1">
+              <div className="text-xs  text-gray-900 mt-1">
                 🎬 {item.title}（投稿日：{item.publishedAt?.split('T')[0]}）
               </div>
             )}
