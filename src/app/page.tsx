@@ -46,6 +46,7 @@ export default function ArchivePage() {
   const [videoMeta, setVideoMeta] = useState<{ title: string; publishedAt: string } | null>(null);
   const [previewEntries, setPreviewEntries] = useState<{ timestamp: string; summary: string }[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     onAuthStateChanged(auth, (currentUser) => setUser(currentUser));
@@ -149,7 +150,6 @@ export default function ArchivePage() {
   };
 
   const handleClear = () => {
-    // 入力は一部保持
     setSpeaker('');
     setRawInput('');
     setPreviewEntries([]);
@@ -189,58 +189,76 @@ export default function ArchivePage() {
     return `${url}&t=${seconds}s`;
   };
 
+  const filteredQuestions = questions.filter(q => {
+    const term = searchTerm.toLowerCase();
+    return (
+      q.questioner.toLowerCase().includes(term) ||
+      q.speaker.toLowerCase().includes(term) ||
+      q.summary.toLowerCase().includes(term)
+    );
+  });
+
   return (
     <main className="p-6 max-w-4xl mx-auto space-y-8">
       <div className="text-center">
         <h1 className="text-2xl font-bold">香美町議会 一般質問アーカイブ検索</h1>
       </div>
 
-      <div className="space-y-4">
-        <div className="space-y-2">
-          {questions.map((item) => (
-            <div key={item.id} className="border p-3 rounded bg-white shadow-sm">
-              <div className="text-sm text-gray-600">
-                {item.date}｜{item.meeting}｜{item.questioner}｜{item.speaker}
-              </div>
-              <div className="text-md whitespace-pre-line">
-                <a
-                  href={formatYoutubeLink(item.youtubeUrl, item.timestamp)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 underline"
-                >
-                  {item.timestamp}
-                </a>
-                ：
-                {item.summary.length > 50 && expandedId !== item.id
-                  ? item.summary.slice(0, 50) + '...'
-                  : item.summary}
-              </div>
-              {item.summary.length > 50 && (
-                <button
-                  className="text-blue-500 text-sm underline mt-1"
-                  onClick={() => setExpandedId(expandedId === item.id ? null : item.id!)}
-                >
-                  {expandedId === item.id ? '閉じる' : 'もっと見る'}
-                </button>
-              )}
-              {item.title && (
-                <div className="text-xs text-gray-500 mt-1">
-                  🎬 {item.title}（投稿日：{item.publishedAt?.split('T')[0]}）
-                </div>
-              )}
-              {user?.email === item.author && (
-                <button
-                  onClick={() => item.id && handleDelete(item.id)}
-                  className="text-red-600 text-sm underline mt-1"
-                >
-                  削除
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
+      <div>
+        <input
+          type="text"
+          placeholder="キーワードで検索（質問者・発言者・要約）"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full border p-2 rounded mb-4"
+        />
+      </div>
 
+      <div className="space-y-4">
+        {filteredQuestions.map((item) => (
+          <div key={item.id} className="border p-3 rounded bg-white shadow-sm">
+            <div className="text-sm text-gray-600">
+              {item.date}｜{item.meeting}｜{item.questioner}｜{item.speaker}
+            </div>
+            <div className="text-md whitespace-pre-line">
+              <a
+                href={formatYoutubeLink(item.youtubeUrl, item.timestamp)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 underline"
+              >
+                {item.timestamp}
+              </a>
+              ：
+              {item.summary.length > 50 && expandedId !== item.id
+                ? item.summary.slice(0, 50) + '...'
+                : item.summary}
+            </div>
+            {item.summary.length > 50 && (
+              <button
+                className="text-blue-500 text-sm underline mt-1"
+                onClick={() => setExpandedId(expandedId === item.id ? null : item.id!)}
+              >
+                {expandedId === item.id ? '閉じる' : 'もっと見る'}
+              </button>
+            )}
+            {item.title && (
+              <div className="text-xs text-gray-500 mt-1">
+                🎬 {item.title}（投稿日：{item.publishedAt?.split('T')[0]}）
+              </div>
+            )}
+            {user?.email === item.author && (
+              <button
+                onClick={() => item.id && handleDelete(item.id)}
+                className="text-red-600 text-sm underline mt-1"
+              >
+                削除
+              </button>
+            )}
+          </div>
+        ))}
+
+        {/* 投稿フォーム（ログイン時のみ） */}
         {user ? (
           <>
             <div className="space-y-2">
