@@ -201,13 +201,13 @@ export default function ArchivePage() {
   return (
     <main className="p-6 max-w-4xl mx-auto space-y-8">
       <div className="text-center">
-        <h1 className="text-2xl font-bold">香美町一般質問アーカイブ（脇坂英作 開発・運営）</h1>
+        <h1 className="text-2xl font-bold">香美町一般質問アーカイブ（脇坂英作 議員が開発・運営）</h1>
       </div>
 
       <div className="mt-4">
         <input
           type="text"
-          placeholder="キーワードで検索（質問者・発言者・キーワード(子育て、医療、介護)）"
+          placeholder="キーワードで検索（質問者・発言者・要約）"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="w-full border p-2 rounded"
@@ -220,7 +220,7 @@ export default function ArchivePage() {
             <div className="text-sm text-gray-600">
               {item.date}｜{item.meeting}｜{item.questioner}｜{item.speaker}
             </div>
-            <div className="text-md whitespace-pre-line">
+            <div className="text-md whitespace-pre-line text-sm sm:text-base leading-relaxed text-gray-800">
               <a
                 href={formatYoutubeLink(item.youtubeUrl, item.timestamp)}
                 target="_blank"
@@ -341,3 +341,4 @@ export default function ArchivePage() {
     </main>
   );
 }
+
