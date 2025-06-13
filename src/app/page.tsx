@@ -207,7 +207,7 @@ export default function ArchivePage() {
       <div className="mt-4">
         <input
           type="text"
-          placeholder="キーワードで検索（質問者・発言者・要約）"
+          placeholder="キーワードで検索（質問者・発言者・キーワード(子育て、医療、介護)）"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="w-full border p-2 rounded"
