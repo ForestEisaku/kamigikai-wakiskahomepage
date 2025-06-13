@@ -91,33 +91,33 @@ export default function ArchivePage() {
       return;
     }
 
-    const lines = rawInput.split('\n').filter(Boolean);
-    try {
-      const batch = lines.map(async (line) => {
-        const match = line.match(/^(\(?\d+:\d+\)?)\s*(.+)$/);
-        if (!match) return;
+    const lines = rawInput.split('\n').map(line => line.trim()).filter(Boolean);
+    const batch = lines.map(async (line) => {
+      const match = line.match(/^(\(?\d+:\d+\)?)\s*(.+)$/);
+      if (!match) return;
 
-        const [timestamp, summary] = match;
-        await addDoc(collection(db, 'questions'), {
-          date: new Date().toISOString().split('T')[0],
-          meeting,
-          speaker: speaker || '（未入力）',
-          summary,
-          timestamp: timestamp.replace(/[()]/g, ''),
-          youtubeUrl,
-          title: videoMeta?.title || '',
-          publishedAt: videoMeta?.publishedAt || '',
-          createdAt: new Date(),
-          author: user?.email || '',
-        });
+      const [_, timestamp, summary] = match;
+      await addDoc(collection(db, 'questions'), {
+        date: new Date().toISOString().split('T')[0],
+        meeting,
+        speaker: speaker || '（未入力）',
+        summary,
+        timestamp: timestamp.replace(/[()]/g, ''),
+        youtubeUrl,
+        title: videoMeta?.title || '',
+        publishedAt: videoMeta?.publishedAt || '',
+        createdAt: new Date(),
+        author: user?.email || '',
       });
+    });
 
+    try {
       await Promise.all(batch);
       alert('保存しました');
       setRawInput('');
       setYoutubeUrl('');
-      setMeeting('');
       setSpeaker('');
+      setMeeting('');
     } catch (err) {
       console.error(err);
       alert('保存に失敗しました');
@@ -153,7 +153,7 @@ export default function ArchivePage() {
         type="text"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="キーワード検索（例：吉川、キャッシュレス、2025年3月定例会）"
+        placeholder="キーワード検索（例：吉川、キャッシュレス）"
         className="w-full border p-2 rounded"
       />
 
@@ -171,14 +171,16 @@ export default function ArchivePage() {
                 {item.timestamp}
               </a>
               ：
-              {expandedId === item.id || item.summary.length <= 50
+              {expandedId === item.id
                 ? item.summary
-                : item.summary.slice(0, 50) + '...'}
+                : item.summary.length > 50
+                  ? item.summary.slice(0, 50) + '...'
+                  : item.summary}
             </div>
             {item.summary.length > 50 && (
               <button
                 className="text-blue-500 text-sm underline mt-1"
-                onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
+                onClick={() => setExpandedId(expandedId === (item.id ?? '') ? null : item.id ?? '')}
               >
                 {expandedId === item.id ? '閉じる' : 'もっと見る'}
               </button>
@@ -212,10 +214,9 @@ export default function ArchivePage() {
           <input
             value={meeting}
             onChange={(e) => setMeeting(e.target.value)}
-            placeholder="例：2025年6月定例会"
+            placeholder="何年何月定例会か（例：2025年6月定例会）"
             className="w-full border p-2 rounded"
           />
-
           <input
             value={youtubeUrl}
             onChange={(e) => setYoutubeUrl(e.target.value)}
@@ -227,14 +228,12 @@ export default function ArchivePage() {
               🎬 {videoMeta.title}（投稿日：{videoMeta.publishedAt.split('T')[0]}）
             </div>
           )}
-
           <input
             value={speaker}
             onChange={(e) => setSpeaker(e.target.value)}
             placeholder="発言者名を入力（例：吉川康治議員）"
             className="w-full border p-2 rounded"
           />
-
           <textarea
             value={rawInput}
             onChange={(e) => setRawInput(e.target.value)}
@@ -242,7 +241,6 @@ export default function ArchivePage() {
             rows={6}
             className="w-full border p-2 rounded"
           />
-
           <button
             onClick={handleSubmit}
             className="bg-green-600 text-white px-4 py-2 rounded"
