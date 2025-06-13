@@ -15,8 +15,9 @@ import {
 type Question = {
   id?: string;
   date: string;
-  questioner: string;
+  meetingDate: string;
   speaker: string;
+  questioner: string;
   summary: string;
   timestamp: string;
   youtubeUrl: string;
@@ -29,11 +30,13 @@ export default function ArchivePage() {
   const [user, setUser] = useState<User | null>(null);
   const [query, setQuery] = useState('');
   const [youtubeUrl, setYoutubeUrl] = useState('');
-  const [questioner, setQuestioner] = useState('');
+  const [meetingDate, setMeetingDate] = useState('');
   const [speaker, setSpeaker] = useState('');
+  const [questioner, setQuestioner] = useState('');
   const [rawInput, setRawInput] = useState('');
   const [questions, setQuestions] = useState<Question[]>([]);
   const [videoMeta, setVideoMeta] = useState<{ title: string; publishedAt: string } | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
     onAuthStateChanged(auth, (currentUser) => setUser(currentUser));
@@ -42,7 +45,7 @@ export default function ArchivePage() {
   useEffect(() => {
     const fetchQuestions = async () => {
       const snapshot = await getDocs(collection(db, 'questions'));
-      const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Question[];
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Question[];
       setQuestions(data);
     };
     fetchQuestions();
@@ -97,13 +100,12 @@ export default function ArchivePage() {
         const match = line.match(/^(\(?\d+:\d+\)?)\s*(.+)$/);
         if (!match) return;
 
-        const timestamp = match[1];
-        const summary = match[2];
-
+        const [timestamp, summary] = match;
         await addDoc(collection(db, 'questions'), {
           date: new Date().toISOString().split('T')[0],
-          questioner: questioner || '（未入力）',
+          meetingDate: meetingDate || '',
           speaker: speaker || '（未入力）',
+          questioner: questioner || '（未入力）',
           summary,
           timestamp: timestamp.replace(/[()]/g, ''),
           youtubeUrl,
@@ -118,6 +120,7 @@ export default function ArchivePage() {
       alert('保存しました');
       setRawInput('');
       setYoutubeUrl('');
+      setMeetingDate('');
       setSpeaker('');
       setQuestioner('');
     } catch (err) {
@@ -138,12 +141,12 @@ export default function ArchivePage() {
     return `${url}&t=${seconds}s`;
   };
 
-  const filtered = questions.filter(
-    (q) =>
-      q.speaker.includes(query) ||
-      q.questioner.includes(query) ||
-      q.date.includes(query) ||
-      q.summary.includes(query)
+  const filtered = questions.filter((q) =>
+    q.speaker.includes(query) ||
+    q.questioner.includes(query) ||
+    q.meetingDate.includes(query) ||
+    q.date.includes(query) ||
+    q.summary.includes(query)
   );
 
   return (
@@ -161,37 +164,51 @@ export default function ArchivePage() {
       />
 
       <div className="space-y-2">
-        {filtered.map((item) => (
-          <div key={item.id} className="border p-3 rounded bg-white shadow-sm">
-            <div className="text-sm text-gray-600">
-              {item.date}｜質問者：{item.questioner}｜発言者：{item.speaker}
-            </div>
-            <div className="text-md">
-              <a
-                href={formatYoutubeLink(item.youtubeUrl, item.timestamp)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 underline"
-              >
-                {item.timestamp}
-              </a>
-              ：{item.summary}
-            </div>
-            {item.title && (
-              <div className="text-xs text-gray-500 mt-1">
-                🎬 {item.title}（投稿日：{item.publishedAt?.split('T')[0]}）
+        {filtered.map((item) => {
+          const isExpanded = expandedId === item.id;
+          const displayText = item.summary.length > 50 && !isExpanded
+            ? `${item.summary.slice(0, 50)}...`
+            : item.summary;
+          return (
+            <div key={item.id} className="border p-3 rounded bg-white shadow-sm">
+              <div className="text-sm text-gray-600">{item.meetingDate}｜{item.questioner}｜{item.speaker}</div>
+              <div className="text-md">
+                <a
+                  href={formatYoutubeLink(item.youtubeUrl, item.timestamp)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 underline"
+                >
+                  {item.timestamp}
+                </a>
+                ：{displayText}
+                {item.summary.length > 50 && (
+                  <button
+                    onClick={() =>
+                      setExpandedId(isExpanded ? null : item.id || null)
+                    }
+                    className="ml-2 text-sm text-blue-500"
+                  >
+                    {isExpanded ? '閉じる' : 'もっと見る'}
+                  </button>
+                )}
               </div>
-            )}
-            {user?.email === item.author && (
-              <button
-                onClick={() => item.id && handleDelete(item.id)}
-                className="text-red-600 text-sm underline mt-1"
-              >
-                削除
-              </button>
-            )}
-          </div>
-        ))}
+              {item.title && (
+                <div className="text-xs text-gray-500 mt-1">
+                  🎬 {item.title}（投稿日：{item.publishedAt?.split('T')[0]}）
+                </div>
+              )}
+              {user?.email === item.author && (
+                <button
+                  onClick={() => item.id && handleDelete(item.id)}
+                  className="text-red-600 text-sm underline mt-1"
+                >
+                  削除
+                </button>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {user ? (
@@ -218,16 +235,21 @@ export default function ArchivePage() {
           )}
 
           <input
-            value={questioner}
-            onChange={(e) => setQuestioner(e.target.value)}
-            placeholder="誰の一般質問かを入力（例：吉川康治議員）"
+            value={meetingDate}
+            onChange={(e) => setMeetingDate(e.target.value)}
+            placeholder="何年何月定例会か（例：2025年6月定例会）"
             className="w-full border p-2 rounded"
           />
-
+          <input
+            value={questioner}
+            onChange={(e) => setQuestioner(e.target.value)}
+            placeholder="誰の一般質問か（例：吉川康治）"
+            className="w-full border p-2 rounded"
+          />
           <input
             value={speaker}
             onChange={(e) => setSpeaker(e.target.value)}
-            placeholder="発言者名を入力（例：町長）"
+            placeholder="発言者名（例：町長）"
             className="w-full border p-2 rounded"
           />
 
