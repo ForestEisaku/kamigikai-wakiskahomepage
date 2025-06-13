@@ -204,13 +204,13 @@ export default function ArchivePage() {
         <h1 className="text-2xl font-bold">香美町議会 一般質問アーカイブ検索</h1>
       </div>
 
-      <div>
+      <div className="mt-4">
         <input
           type="text"
           placeholder="キーワードで検索（質問者・発言者・要約）"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full border p-2 rounded mb-4"
+          className="w-full border p-2 rounded"
         />
       </div>
 
@@ -258,7 +258,6 @@ export default function ArchivePage() {
           </div>
         ))}
 
-        {/* 投稿フォーム（ログイン時のみ） */}
         {user ? (
           <>
             <div className="space-y-2">
