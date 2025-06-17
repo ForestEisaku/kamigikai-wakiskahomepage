@@ -37,6 +37,7 @@ type Question = {
 
 export default function ArchivePage() {
   const [user, setUser] = useState<User | null>(null);
+  
   const [meeting, setMeeting] = useState('');
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [speaker, setSpeaker] = useState('');
@@ -206,7 +207,7 @@ export default function ArchivePage() {
       <div className="text-center">
         <h1 className="text-2xl font-bold text-center">
   香美町一般質問アーカイブ<br />
-  <span className="text-sm text-gray-100block">脇坂英作 開発・運営</span>
+  <span className="text-sm text-gray-600 block">脇坂英作 開発・運営</span>
 </h1>
       </div>
 
@@ -356,3 +357,4 @@ export default function ArchivePage() {
     </main>
   );
 }
+
