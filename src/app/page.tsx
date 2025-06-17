@@ -203,7 +203,10 @@ export default function ArchivePage() {
   return (
     <main className="p-6 max-w-4xl mx-auto space-y-8">
       <div className="text-center">
-        <h1 className="text-2xl font-bold">香美町一般質問アーカイブ（脇坂英作が開発・運営）</h1>
+        <h1 className="text-2xl font-bold">
+  香美町一般質問アーカイブ<br />
+  <span className="text-sm text-gray-600">（脇坂英作 開発・運営）</span>
+</h1>
       </div>
 
       <div className="mt-4 space-y-2">
@@ -350,3 +353,4 @@ export default function ArchivePage() {
     </main>
   );
 }
+
