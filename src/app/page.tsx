@@ -37,7 +37,7 @@ type Question = {
 
 export default function ArchivePage() {
   const [user, setUser] = useState<User | null>(null);
-  
+
   const [meeting, setMeeting] = useState('');
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [speaker, setSpeaker] = useState('');
@@ -191,42 +191,41 @@ export default function ArchivePage() {
   };
 
   const filteredQuestions = questions.filter(q => {
-  return searchTerms.every(term => {
-    const lower = term.toLowerCase();
-    return (
-      q.questioner.toLowerCase().includes(lower) ||
-      q.speaker.toLowerCase().includes(lower) ||
-      q.summary.toLowerCase().includes(lower)
-    );
+    return searchTerms.every(term => {
+      const lower = term.toLowerCase();
+      return (
+        q.questioner.toLowerCase().includes(lower) ||
+        q.speaker.toLowerCase().includes(lower) ||
+        q.summary.toLowerCase().includes(lower)
+      );
+    });
   });
-});
-});
 
   return (
     <main className="p-6 max-w-4xl mx-auto space-y-8">
       <div className="text-center">
         <h1 className="text-2xl font-bold text-center">
-  香美町一般質問アーカイブ<br />
-  <span className="text-sm text-gray-600 block">脇坂英作 開発・運営</span>
-</h1>
+          香美町一般質問アーカイブ<br />
+          <span className="text-sm text-gray-600 block drop-shadow-sm bg-white/70 px-1 rounded">脇坂英作 開発・運営</span>
+        </h1>
       </div>
 
       <div className="mt-4 space-y-2">
-  {[0, 1, 2].map((index) => (
-    <input
-      key={index}
-      type="text"
-      placeholder={`キーワード${index + 1}（質問者・発言者・要約）`}
-      value={searchTerms[index]}
-      onChange={(e) => {
-        const newTerms = [...searchTerms];
-        newTerms[index] = e.target.value;
-        setSearchTerms(newTerms);
-      }}
-      className="w-full border p-2 rounded"
-    />
-  ))}
-</div>
+        {[0, 1, 2].map((index) => (
+          <input
+            key={index}
+            type="text"
+            placeholder={`キーワード${index + 1}（質問者・発言者・要約）`}
+            value={searchTerms[index]}
+            onChange={(e) => {
+              const newTerms = [...searchTerms];
+              newTerms[index] = e.target.value;
+              setSearchTerms(newTerms);
+            }}
+            className="w-full border p-2 rounded"
+          />
+        ))}
+      </div>
 
       <div className="space-y-4">
         {filteredQuestions.map((item) => (
@@ -272,7 +271,7 @@ export default function ArchivePage() {
           </div>
         ))}
 
-        {user && isAdmin ? (
+        {user ? (
           <>
             <div className="space-y-2">
               <select
@@ -341,10 +340,8 @@ export default function ArchivePage() {
               )}
             </div>
           </>
-        ) : user ? (
-        
-      ) : (
-        <div className="text-center">
+        ) : (
+          <div className="text-center">
             <button
               onClick={handleLogin}
               className="bg-blue-500 text-white px-4 py-2 rounded"
@@ -357,4 +354,3 @@ export default function ArchivePage() {
     </main>
   );
 }
-
