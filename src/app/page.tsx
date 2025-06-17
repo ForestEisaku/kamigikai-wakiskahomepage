@@ -37,8 +37,6 @@ type Question = {
 
 export default function ArchivePage() {
   const [user, setUser] = useState<User | null>(null);
-  const adminEmails = ['admin@example.com']; // 管理者のメールアドレスをここに指定
-  const isAdmin = adminEmails.includes(user?.email ?? '');
   const [meeting, setMeeting] = useState('');
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [speaker, setSpeaker] = useState('');
