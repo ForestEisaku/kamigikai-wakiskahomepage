@@ -37,7 +37,7 @@ type Question = {
 
 export default function ArchivePage() {
   const [user, setUser] = useState<User | null>(null);
-  const adminEmails = ['forestengineering51@yahoo.co.jp']; // 管理者のメールアドレスをここに指定
+  const adminEmails = ['admin@example.com']; // 管理者のメールアドレスをここに指定
   const isAdmin = adminEmails.includes(user?.email ?? '');
   const [meeting, setMeeting] = useState('');
   const [youtubeUrl, setYoutubeUrl] = useState('');
@@ -201,13 +201,14 @@ export default function ArchivePage() {
     );
   });
 });
+});
 
   return (
     <main className="p-6 max-w-4xl mx-auto space-y-8">
       <div className="text-center">
-        <h1 className="text-2xl font-bold">
+        <h1 className="text-2xl font-bold text-center">
   香美町一般質問アーカイブ<br />
-  <span className="text-sm text-gray-800">（脇坂英作 開発・運営）</span>
+  <span className="text-sm text-gray-600 block">脇坂英作 開発・運営</span>
 </h1>
       </div>
 
@@ -342,7 +343,7 @@ export default function ArchivePage() {
             </div>
           </>
         ) : user ? (
-        <div className="text-center text-gray-600">このページの投稿機能は管理者のみが使用できます。</div>
+        
       ) : (
         <div className="text-center">
             <button
